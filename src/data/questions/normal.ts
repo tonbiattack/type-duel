@@ -301,4 +301,266 @@ const result: B = value;`,
     explanation:
       "Record<string, never> は id プロパティを持ちません。B が要求する id: number を満たせないため、A → B は通りません。",
   }),
+  duelQuestion({
+    id: "normal-object-missing-third-property",
+    difficulty: "normal",
+    topic: ["object"],
+    prompt: "プロパティが足りないオブジェクト型を、要求の多い型へ代入できるか？",
+    code: `type A = { a: number; b: string };
+type B = { a: number; b: string; c: boolean };
+
+declare const value: A;
+const result: B = value;`,
+    assignable: false,
+    explanation:
+      "B は `c` を要求しますが A にはありません。構造的部分型では必要なプロパティが揃っている必要があります。",
+  }),
+  duelQuestion({
+    id: "normal-optional-explicit-undefined",
+    difficulty: "normal",
+    topic: ["optional", "undefined"],
+    prompt: "省略可能プロパティを、undefined を明示した省略可能プロパティへ代入できるか？",
+    code: `type A = { a?: number };
+type B = { a?: number | undefined };
+
+declare const value: A;
+const result: B = value;`,
+    assignable: true,
+    explanation:
+      "`a?: number` は `number | undefined` を含みます。`a?: number | undefined` と実質同じなので代入できます。",
+  }),
+  duelQuestion({
+    id: "normal-undefined-to-optional",
+    difficulty: "normal",
+    topic: ["optional", "undefined"],
+    prompt: "undefined を含むプロパティを、省略可能プロパティへ代入できるか？",
+    code: `type A = { a: number | undefined };
+type B = { a?: number };
+
+declare const value: A;
+const result: B = value;`,
+    assignable: true,
+    explanation:
+      "`a?: number` は `number | undefined` を受け取れます。必須か省略可能かの違いはありますが、型としては互換です。",
+  }),
+  duelQuestion({
+    id: "normal-readonly-array-alias",
+    difficulty: "normal",
+    topic: ["readonly", "array"],
+    prompt: "readonly 配列の糖衣構文を、ReadonlyArray へ代入できるか？",
+    code: `type A = readonly string[];
+type B = ReadonlyArray<string>;
+
+declare const value: A;
+const result: B = value;`,
+    assignable: true,
+    explanation:
+      "`readonly string[]` と `ReadonlyArray<string>` は同じ型の別表記です。相互に代入できます。",
+  }),
+  duelQuestion({
+    id: "normal-index-signature-to-object",
+    difficulty: "normal",
+    topic: ["object", "index signature"],
+    prompt: "インデックスシグネチャの型を、具体的なプロパティの型へ代入できるか？",
+    code: `type A = { [key: string]: number };
+type B = { a: number };
+
+declare const value: A;
+const result: B = value;`,
+    assignable: false,
+    explanation:
+      "インデックスシグネチャは「任意のキーがある」ことを示すだけで、`a` が存在する保証はありません。そのため B へは代入できません。",
+  }),
+  duelQuestion({
+    id: "normal-object-to-index-signature",
+    difficulty: "normal",
+    topic: ["object", "index signature"],
+    prompt: "具体的なプロパティを持つ型を、インデックスシグネチャの型へ代入できるか？",
+    code: `type A = { a: number };
+type B = { [key: string]: number };
+
+declare const value: A;
+const result: B = value;`,
+    assignable: true,
+    explanation:
+      "`{ a: number }` は「すべてのプロパティが number」という条件を満たします。インデックスシグネチャへ代入できます。",
+  }),
+  duelQuestion({
+    id: "normal-tuple-shorter-to-longer",
+    difficulty: "normal",
+    topic: ["tuple"],
+    prompt: "要素数が少ないタプルを、要素数が多いタプルへ代入できるか？",
+    code: `type A = [string, number];
+type B = [string, number, boolean];
+
+declare const value: A;
+const result: B = value;`,
+    assignable: false,
+    explanation:
+      "B は 3 要素を要求しますが A は 2 要素です。タプルは長さも型の一部なので代入できません。",
+  }),
+  duelQuestion({
+    id: "normal-tuple-longer-to-shorter",
+    difficulty: "normal",
+    topic: ["tuple"],
+    prompt: "要素数が多いタプルを、要素数が少ないタプルへ代入できるか？",
+    code: `type A = [string, number, boolean];
+type B = [string, number];
+
+declare const value: A;
+const result: B = value;`,
+    assignable: false,
+    explanation: "タプルは長さが型の一部です。3 要素のタプルを 2 要素のタプルへは代入できません。",
+  }),
+  duelQuestion({
+    id: "normal-union-to-wider-union",
+    difficulty: "normal",
+    topic: ["union"],
+    prompt: "union を、メンバーを追加した union へ代入できるか？",
+    code: `type A = { a: string } | { b: number };
+type B = { a: string } | { b: number } | { c: boolean };
+
+declare const value: A;
+const result: B = value;`,
+    assignable: true,
+    explanation: "A の各メンバーが B に含まれています。union を広げる方向の代入は通ります。",
+  }),
+  duelQuestion({
+    id: "normal-wider-union-to-union",
+    difficulty: "normal",
+    topic: ["union"],
+    prompt: "メンバーが多い union を、メンバーが少ない union へ代入できるか？",
+    code: `type A = { a: string } | { b: number } | { c: boolean };
+type B = { a: string } | { b: number };
+
+declare const value: A;
+const result: B = value;`,
+    assignable: false,
+    explanation:
+      "A には `{ c: boolean }` が含まれます。B はそれを受け取れないため、A → B は通りません。",
+  }),
+  duelQuestion({
+    id: "normal-function-return-widening",
+    difficulty: "normal",
+    topic: ["function"],
+    prompt: "戻り値が狭い関数を、戻り値が広い関数型へ代入できるか？",
+    code: `type A = () => string;
+type B = () => string | number;
+
+declare const value: A;
+const result: B = value;`,
+    assignable: true,
+    explanation:
+      "戻り値は共変です。`string` は `string | number` の部分型なので、A → B は通ります。",
+  }),
+  duelQuestion({
+    id: "normal-function-return-narrowing",
+    difficulty: "normal",
+    topic: ["function"],
+    prompt: "戻り値が広い関数を、戻り値が狭い関数型へ代入できるか？",
+    code: `type A = () => string | number;
+type B = () => string;
+
+declare const value: A;
+const result: B = value;`,
+    assignable: false,
+    explanation:
+      "A は `number` を返す可能性があります。B は `string` だけを期待するため、A → B は通りません。",
+  }),
+  duelQuestion({
+    id: "normal-intersection-to-member",
+    difficulty: "normal",
+    topic: ["intersection", "object"],
+    prompt: "交差型を、その一方の型へ代入できるか？",
+    code: `type A = { a: number } & { b: string };
+type B = { a: number };
+
+declare const value: A;
+const result: B = value;`,
+    assignable: true,
+    explanation:
+      "交差型は両方のプロパティを持ちます。`{ a: number }` が要求する `a` を満たすため代入できます。",
+  }),
+  duelQuestion({
+    id: "normal-member-to-intersection",
+    difficulty: "normal",
+    topic: ["intersection", "object"],
+    prompt: "一方の型だけを、交差型へ代入できるか？",
+    code: `type A = { a: number };
+type B = { a: number } & { b: string };
+
+declare const value: A;
+const result: B = value;`,
+    assignable: false,
+    explanation:
+      "B は `b` も要求しますが A にはありません。交差型へ代入するには両方の制約を満たす必要があります。",
+  }),
+  duelQuestion({
+    id: "normal-record-to-index-signature",
+    difficulty: "normal",
+    topic: ["object", "utility"],
+    prompt: "Record で作った型を、インデックスシグネチャの型へ代入できるか？",
+    code: `type A = Record<string, number>;
+type B = { [key: string]: number };
+
+declare const value: A;
+const result: B = value;`,
+    assignable: true,
+    explanation:
+      "`Record<string, number>` は `{ [key: string]: number }` の別表記です。相互に代入できます。",
+  }),
+  duelQuestion({
+    id: "normal-nullable-to-wider-nullable",
+    difficulty: "normal",
+    topic: ["null", "union"],
+    prompt: "null を含む型を、undefined も含む型へ代入できるか？",
+    code: `type A = { a: number } | null;
+type B = { a: number } | null | undefined;
+
+declare const value: A;
+const result: B = value;`,
+    assignable: true,
+    explanation: "A の各メンバーが B に含まれています。union を広げる方向なので代入できます。",
+  }),
+  duelQuestion({
+    id: "normal-wider-nullable-to-narrower",
+    difficulty: "normal",
+    topic: ["null", "union"],
+    prompt: "undefined を含む型を、null だけを含む型へ代入できるか？",
+    code: `type A = { a: number } | null | undefined;
+type B = { a: number } | null;
+
+declare const value: A;
+const result: B = value;`,
+    assignable: false,
+    explanation:
+      "A には `undefined` が含まれます。B はそれを受け取れないため、A → B は通りません。",
+  }),
+  duelQuestion({
+    id: "normal-readonly-to-readonly",
+    difficulty: "normal",
+    topic: ["readonly", "object"],
+    prompt: "readonly プロパティ同士の代入は通るか？",
+    code: `type A = { readonly a: number };
+type B = { readonly a: number };
+
+declare const value: A;
+const result: B = value;`,
+    assignable: true,
+    explanation: "同じ型なので当然代入できます。readonly 同士でも問題ありません。",
+  }),
+  duelQuestion({
+    id: "normal-mutable-to-readonly-object",
+    difficulty: "normal",
+    topic: ["readonly", "object"],
+    prompt: "書き換え可能なプロパティを、readonly プロパティへ代入できるか？",
+    code: `type A = { a: number };
+type B = { readonly a: number };
+
+declare const value: A;
+const result: B = value;`,
+    assignable: true,
+    explanation:
+      "readonly は「読み取り専用として扱う」約束を強めるだけです。書き換え可能 → readonly の代入は通ります。",
+  }),
 ];

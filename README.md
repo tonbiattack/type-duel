@@ -29,30 +29,63 @@ TypeScript の型を「読んで・予測して・判定する」ブラウザゲ
 
 ### 3 つのモード
 
-| モード | 問われること | 回答形式 |
-| --- | --- | --- |
-| **Duel** | `const result: B = value;` が型検査を通るか | 二択 |
-| **Infer** | `const value = ...` から推論される型は何か | 四択 |
-| **Detective** | そのコンパイルエラーの原因は何か | 四択 |
+| モード | 問われること | 回答形式 | 問題数 |
+| --- | --- | --- | --- |
+| **Duel** | `const result: B = value;` が型検査を通るか | 二択 | 107 問 |
+| **Infer** | `const value = ...` から推論される型は何か | 四択 | 91 問 |
+| **Detective** | そのコンパイルエラーの原因は何か | 四択 | 103 問 |
 
 <div align="center">
 <img src="docs/images/infer.png" alt="Infer モード" width="49%">
 <img src="docs/images/detective.png" alt="Detective モード" width="49%">
 </div>
 
+### 3 つの遊びかた
+
+| 遊びかた | 内容 |
+| --- | --- |
+| **10問チャレンジ** | 10 問をじっくり。毎問解説を読める学習モード |
+| **60秒タイムアタック** | 60 秒で何問解けるか。回答後は自動で次へ。ベスト記録をローカル保存 |
+| **復習** | 間違えた問題をトピック別に解き直す。制限時間なし |
+
+<div align="center">
+<img src="docs/images/timeattack.png" alt="タイムアタックの結果" width="49%">
+<img src="docs/images/review.png" alt="復習画面" width="49%">
+</div>
+
+### 段階解説
+
+複合型の問題は「どの順番で型が評価されるか」を追えないと納得できません。
+Advanced の問題には段階解説を付け、1 ステップずつ開けるようにしています。
+
+<img src="docs/images/advanced.png" alt="段階解説" width="720">
+
+### 難易度
+
+| 難易度 | 扱うトピック |
+| --- | --- |
+| Easy | literal / primitive / union / array |
+| Normal | object / optional / readonly / unknown / never / tuple |
+| Hard | generic / conditional / indexed access / `keyof` / mapped types |
+| **Advanced** | 複数の型機能が絡み合う複合問題（分配条件型 × union × never、mapped types × 修飾子、template literal × union など） |
+
+Advanced は上級者向けなので、タイトル画面では折りたたんでいます（初期表示を複雑にしないため）。
+
 ## 特徴
 
-- **正解データをコンパイラで検証** — 全 147 問の正答を TypeScript Compiler API が CI で検証します。問題データの誤りはテストが落ちるため、`answer` の書き間違いが混入しません。
+- **正解データをコンパイラで検証** — 全 301 問の正答を TypeScript Compiler API が CI で検証します。問題データの誤りはテストが落ちるため、`answer` の書き間違いが混入しません。
 - **問題追加はデータ編集だけ** — `src/data/questions/` に 1 問足すだけで、検証・出題・採点に自動で乗ります。
+- **段階解説** — 複合型の問題は「どの順番で型が評価されるか」を 1 ステップずつ追えます。読み飛ばして次へ進むこともできます。
 - **キーボードだけで完走** — `1`〜`4` で回答、`Enter` で次へ、`Esc` でポーズ。
 - **モバイル対応** — 大きなタップ領域、`prefers-reduced-motion` / `prefers-contrast` 対応。
-- **サーバー不要** — 静的 SPA。外部 API・DB・認証はありません。
+- **サーバー不要** — 静的 SPA。学習記録は localStorage に保存し、外部 API・DB・認証はありません。
 
 ## 遊び方
 
-1. タイトル画面でモードと難易度を選ぶ
-2. 1 問 15 秒以内に回答する
-3. 正誤と解説を確認して次へ。10 問終わると結果が表示される
+1. タイトル画面で遊びかたを選ぶ
+2. 10問チャレンジならモードと難易度を選ぶ
+3. 1 問 15 秒以内に回答する（復習は制限時間なし）
+4. 正誤と解説を確認して次へ。10 問終わると結果が表示される
 
 | 操作 | キー |
 | --- | --- |
@@ -62,6 +95,8 @@ TypeScript の型を「読んで・予測して・判定する」ブラウザゲ
 
 ### スコア
 
+**10問チャレンジ / 復習**
+
 | 項目 | 計算 |
 | --- | --- |
 | 正解 | 100 点 + 残り秒数 × 5 点（端数切り捨て） |
@@ -69,13 +104,26 @@ TypeScript の型を「読んで・予測して・判定する」ブラウザゲ
 
 連続正解数は表示のみで、スコア倍率はかかりません。
 
-### 難易度
+**60秒タイムアタック**
 
-| 難易度 | 扱うトピック |
+| 項目 | 計算 |
 | --- | --- |
-| Easy | literal / primitive / union / array |
-| Normal | object / optional / readonly / unknown / never / tuple |
-| Hard | generic / conditional / indexed access / `keyof` / mapped types |
+| 正解 | 100 点 + 連続正解 × 20 点（最大 5 連続まで加算） |
+| 不正解 | -50 点（スコアは 0 未満にならない） |
+
+タイムアタックは「一瞬で判断する」テンポが命なので、コードが長い問題と
+Advanced は出題対象から除外しています。回答後は正誤だけを短く表示して
+自動で次の問題へ進み、解説は結果画面からまとめて確認できます。
+
+### 学習記録
+
+以下を localStorage に保存します。壊れたデータや容量超過でも通常プレイは止まりません。
+
+- 問題ごとの正誤・連続正解・回答時間（復習の出題に使用）
+- タイムアタックの自己ベスト
+- 直近出題した問題 ID（未出題を優先する抽選に使用）
+
+復習画面から学習記録を削除できます。
 
 ## はじめかた
 
@@ -176,6 +224,63 @@ detectiveQuestion({
 追加したら `npm run test` を実行してください。`tests/questions.test.ts` が
 TypeScript Compiler API で全問を検証します。
 
+### 段階解説を付ける（任意）
+
+複合型の問題は、評価の順序を追えないと納得できません。
+`explanationSteps` を指定すると「1 ステップずつ開く」UI が使えます。
+
+```ts
+duelQuestion({
+  id: "adv-duel-distributive-union",
+  difficulty: "advanced",
+  topic: ["conditional", "distributive", "union"],
+  prompt: "分配条件型の結果を true 型へ代入できるか？",
+  code: `type IsString<T> = T extends string ? true : false;
+type A = IsString<"a" | "b">;
+type B = true;
+
+declare const value: A;
+const result: B = value;`,
+  assignable: true,
+  explanation: "条件型は union に分配されます。",
+  explanationSteps: [
+    {
+      title: "条件型を分配する",
+      body: "`IsString<\"a\" | \"b\">` は `IsString<\"a\"> | IsString<\"b\">` になります。",
+      typeAfter: `IsString<"a"> | IsString<"b">`,
+    },
+    {
+      title: "各メンバーを評価する",
+      body: "どちらも string の部分型なので `true` に解決されます。",
+      typeAfter: "true | true",
+    },
+    {
+      title: "union を畳む",
+      body: "`true | true` は `true` になります。",
+      typeAfter: "true",
+    },
+  ],
+}),
+```
+
+段階解説は任意です。短い `explanation` だけでも問題は成立します。
+
+### タイムアタックへの出題を制御する
+
+タイムアタックは「一瞬で判断する」テンポが命なので、以下は自動で除外されます。
+
+- Advanced 難易度
+- コードが 8 行 / 220 文字を超える問題
+
+個別に制御したい場合は `timeAttackEligible` を指定します。
+
+```ts
+duelQuestion({
+  // ...
+  timeAttackEligible: false, // タイムアタックでは出題しない
+}),
+```
+
 ### 検証の仕組み
 
 | モード | 検証内容 |
@@ -189,13 +294,16 @@ TypeScript Compiler API で全問を検証します。
 - コンパイラ設定は `strict` / `strictNullChecks` / `noEmit` を固定
 - TypeScript のバージョンは `package-lock.json` で固定（更新で判定が変わると CI が検知）
 - 重複 ID・選択肢数・解説欠落・選択肢ラベルの重複をスキーマ検証で検出
-- 難易度ごとの最低問題数、正解位置の偏りをチェック
+- 難易度ごとの最低問題数、正解位置の偏り、トピックの偏りをチェック
+- 段階解説の各ステップに title / body があるか
+- タイムアタックに出題できる問題が十分あるか
 
 問題作成時は、コンパイラが実際に何を返すかを確認できます。
 
 ```bash
 node scripts/inspect.mjs infer 'const value = "hello";'   # => value: "hello"
 node scripts/inspect.mjs diag 'const value: string = null;' # => TS2322: ...
+node scripts/check-snippets.mjs cases.json                  # 複数まとめて確認
 ```
 
 ## 技術スタック
@@ -211,9 +319,10 @@ node scripts/inspect.mjs diag 'const value: string = null;' # => TS2322: ...
 
 ### 設計方針
 
-- **ゲーム進行は純粋関数** — `src/lib/game.ts` に状態遷移を集約し、React から独立させています。二重回答・時間切れ・最終問題といった境界を UI を介さず直接テストできます。
+- **ゲーム進行は純粋関数** — `src/lib/game.ts` に状態遷移を集約し、React から独立させています。二重回答・時間切れ・最終問題といった境界を UI を介さず直接テストできます。3 つの遊びかた（10問 / タイムアタック / 復習）も同じ状態機械で扱います。
 - **問題データはスキーマで守る** — モード別の判別可能 union と実行時バリデーションの二段構え。
 - **選択肢と正答をずらさない** — ヘルパー関数が正解の選択肢 ID を解決するため、対応ミスが構造的に起きません。
+- **保存は失敗しても止まらない** — localStorage の読み書きはすべて例外を握りつぶし、壊れたデータは項目単位で捨てます。学習記録がなくても通常プレイは成立します。
 
 ### ディレクトリ構成
 
@@ -223,8 +332,9 @@ src/
   components/             UI コンポーネント
   data/questions/         問題データ（モード・難易度別）
   lib/
-    game.ts               ゲーム進行の純粋ロジック
-    validate.ts           問題データのバリデーション
+    game.ts               ゲーム進行の純粋ロジック（3 形式）
+    storage.ts            学習記録・自己ベストの保存
+    validate.ts           問題データのバリデーション・集計
     highlight.ts          軽量シンタックスハイライト
     richtext.ts           インラインコードの解析
     config.ts             スコア・制限時間などの設定値
@@ -246,8 +356,11 @@ npm run verify   # 送る前にこれが通ることを確認
 - [x] Duel モード（二択・タイマー・採点）
 - [x] Infer モード（型推論の四択）
 - [x] Detective モード（型エラー原因の四択）
-- [ ] タイムアタック / エンドレスモード
-- [ ] ローカル記録（最高スコア・復習）
+- [x] Advanced 難易度（複合問題・段階解説）
+- [x] 60 秒タイムアタック（自動送り・自己ベスト）
+- [x] 復習モード（トピック別・ローカル記録）
+- [x] 問題 300 問以上
+- [ ] エンドレスモード
 - [ ] 問題のさらなる拡充
 
 ## ライセンス

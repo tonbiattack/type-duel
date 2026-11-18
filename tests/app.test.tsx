@@ -10,7 +10,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../src/App";
-import { QUESTIONS_PER_GAME } from "../src/lib/config";
+import { QUESTIONS_PER_GAME, TIME_ATTACK_DURATION_MS } from "../src/lib/config";
 import type { GameMode } from "../src/types/question";
 
 type User = ReturnType<typeof userEvent.setup>;
@@ -69,12 +69,17 @@ describe("App", () => {
     expect(screen.getByRole("article", { name: /Detective/i })).toBeInTheDocument();
   });
 
-  it("各モードに難易度ボタンが 3 つある", () => {
+  it("各モードに難易度ボタンがある（Advanced は折りたたみ）", () => {
     render(<App />);
     for (const mode of ["Duel", "Infer", "Detective"]) {
       const card = screen.getByRole("article", { name: new RegExp(mode, "i") });
+      // Easy / Normal / Hard + Advanced の 4 つ
       const buttons = within(card).getAllByRole("button");
-      expect(buttons, mode).toHaveLength(3);
+      expect(buttons, mode).toHaveLength(4);
+      // Advanced は details 内にあり、初期状態では閉じている
+      const details = card.querySelector("details.mode-advanced");
+      expect(details, mode).not.toBeNull();
+      expect(details?.hasAttribute("open"), mode).toBe(false);
     }
   });
 
@@ -253,7 +258,7 @@ describe("App", () => {
       expect(screen.getByRole("heading", { name: "結果" })).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "難易度を選び直す" }));
+    await user.click(screen.getByRole("button", { name: "モードを選び直す" }));
     expect(screen.getByRole("article", { name: /Duel/i })).toBeInTheDocument();
   });
 
@@ -279,5 +284,171 @@ describe("App", () => {
     // 修正例がある問題ならコードブロックが 2 つ（問題 + 修正例）になる
     const blocks = screen.getAllByLabelText(/コード/);
     expect(blocks.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("タイムアタック（UI）", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    window.localStorage.clear();
+  });
+
+  it("タイトルから開始でき、60 秒タイマーが表示される", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /60秒タイムアタック/ }));
+    expect(screen.getByLabelText("判定する TypeScript コード")).toBeInTheDocument();
+    expect(screen.getByText("タイムアタック")).toBeInTheDocument();
+  });
+
+  it("回答すると自動で次の問題へ進む", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: /60秒タイムアタック/ }));
+
+    const before = currentCode();
+    await user.keyboard("1");
+
+    // フィードバック表示後、自動で次へ
+    await waitFor(() => {
+      expect(currentCode()).not.toBe(before);
+    });
+  });
+
+  it("時間切れで結果画面へ移る", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: /60秒タイムアタック/ }));
+
+    await vi.advanceTimersByTimeAsync(TIME_ATTACK_DURATION_MS + 1000);
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "結果" })).toBeInTheDocument();
+    });
+  });
+
+  it("結果画面に自己ベストが表示される", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: /60秒タイムアタック/ }));
+
+    await vi.advanceTimersByTimeAsync(TIME_ATTACK_DURATION_MS + 1000);
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "結果" })).toBeInTheDocument();
+    });
+    expect(screen.getByText("自己ベスト")).toBeInTheDocument();
+  });
+});
+
+describe("復習（UI）", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    window.localStorage.clear();
+  });
+
+  it("記録がなければ復習画面に案内が出る", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /復習/ }));
+    expect(screen.getByRole("heading", { name: "復習" })).toBeInTheDocument();
+    expect(screen.getByText(/まだ学習記録がありません/)).toBeInTheDocument();
+  });
+
+  it("間違えた問題が復習対象になる", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+
+    // Duel Easy を「2」で回答して誤答を作る
+    await startGame(user, "duel");
+    await playThrough(user, "2");
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "結果" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "モードを選び直す" }));
+    await user.click(screen.getByRole("button", { name: /復習/ }));
+
+    expect(screen.getByRole("heading", { name: "復習" })).toBeInTheDocument();
+    expect(screen.getByText(/苦手な問題をまとめて復習/)).toBeInTheDocument();
+  });
+
+  it("復習では制限時間が表示されない", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+
+    await startGame(user, "duel");
+    await playThrough(user, "2");
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "結果" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "モードを選び直す" }));
+    await user.click(screen.getByRole("button", { name: /復習/ }));
+    await user.click(screen.getByRole("button", { name: /苦手な問題をまとめて復習/ }));
+
+    expect(screen.getByLabelText("判定する TypeScript コード")).toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  });
+});
+
+describe("段階解説（UI）", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    window.localStorage.clear();
+  });
+
+  it("Advanced 問題で段階解説を開ける", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+
+    // Advanced を開いて開始
+    const card = screen.getByRole("article", { name: /Duel/i });
+    await user.click(within(card).getByText(/Advanced（複合問題）/));
+    await user.click(within(card).getByRole("button", { name: /Advanced/ }));
+
+    await user.keyboard("1");
+    await waitFor(() => {
+      expect(screen.getByLabelText("判定結果と解説")).toBeInTheDocument();
+    });
+
+    expect(screen.getByLabelText("型の評価ステップ")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "まとめて表示" })).toBeInTheDocument();
+  });
+
+  it("段階解説をまとめて開ける", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+
+    const card = screen.getByRole("article", { name: /Duel/i });
+    await user.click(within(card).getByText(/Advanced（複合問題）/));
+    await user.click(within(card).getByRole("button", { name: /Advanced/ }));
+
+    await user.keyboard("1");
+    await waitFor(() => {
+      expect(screen.getByLabelText("型の評価ステップ")).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "まとめて表示" }));
+    expect(screen.getByRole("button", { name: "閉じる" })).toBeInTheDocument();
   });
 });
