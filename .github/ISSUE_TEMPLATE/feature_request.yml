@@ -1,0 +1,42 @@
+name: 機能提案
+description: 新しいモード・機能・改善を提案する
+title: "[Feature] "
+labels: enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        提案ありがとうございます。実装前に方向性をすり合わせたいので、
+        「何を解決したいか」を中心に書いていただけると助かります。
+  - type: textarea
+    id: problem
+    attributes:
+      label: 解決したい課題
+      description: 現状のどこに不便や物足りなさを感じていますか
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 提案する内容
+      description: どう解決するか。UI のイメージがあれば添えてください
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 検討した代替案（任意）
+    validations:
+      required: false
+  - type: dropdown
+    id: scope
+    attributes:
+      label: 影響範囲
+      options:
+        - 問題データの追加のみ
+        - UI の変更
+        - ゲームロジックの変更
+        - 新しいモード
+        - その他
+    validations:
+      required: true

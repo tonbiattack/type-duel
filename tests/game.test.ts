@@ -5,7 +5,11 @@
  * 純粋関数のレベルで検証する。
  */
 import { describe, expect, it } from "vitest";
-import { allQuestions, getQuestionsForDifficulty } from "../src/data/questions";
+import {
+  allQuestions,
+  getQuestionsForDifficulty,
+  getQuestionsForModeAndDifficulty,
+} from "../src/data/questions";
 import {
   answer,
   calculateScore,
@@ -31,6 +35,7 @@ const zeroRandom = (): number => 0;
 /** テスト用にゲームを開始する。 */
 function startEasy(): GameState {
   return startGame({
+    mode: "duel",
     difficulty: "easy",
     questions: getQuestionsForDifficulty("easy"),
     random: zeroRandom,
@@ -106,7 +111,7 @@ describe("startGame", () => {
   });
 
   it("問題集が空なら例外を投げる", () => {
-    expect(() => startGame({ difficulty: "easy", questions: [] })).toThrow();
+    expect(() => startGame({ mode: "duel", difficulty: "easy", questions: [] })).toThrow();
   });
 });
 
@@ -336,5 +341,84 @@ describe("currentQuestion", () => {
   it("現在の問題を返す", () => {
     const state = startEasy();
     expect(currentQuestion(state)).toBe(state.questions[0]);
+  });
+});
+
+describe("モード別のゲーム進行", () => {
+  it("Infer モードで 10 問を完走できる", () => {
+    let state = startGame({
+      mode: "infer",
+      difficulty: "easy",
+      questions: getQuestionsForModeAndDifficulty("infer", "easy"),
+      random: zeroRandom,
+    });
+
+    expect(state.mode).toBe("infer");
+    expect(state.questions).toHaveLength(QUESTIONS_PER_GAME);
+
+    for (let i = 0; i < QUESTIONS_PER_GAME; i += 1) {
+      state = next(answerCorrectly(state));
+    }
+
+    expect(state.phase).toBe("finished");
+    expect(state.results).toHaveLength(QUESTIONS_PER_GAME);
+    expect(summarize(state).correctCount).toBe(QUESTIONS_PER_GAME);
+  });
+
+  it("Detective モードで 10 問を完走できる", () => {
+    let state = startGame({
+      mode: "detective",
+      difficulty: "easy",
+      questions: getQuestionsForModeAndDifficulty("detective", "easy"),
+      random: zeroRandom,
+    });
+
+    expect(state.mode).toBe("detective");
+
+    for (let i = 0; i < QUESTIONS_PER_GAME; i += 1) {
+      state = next(answerCorrectly(state));
+    }
+
+    expect(state.phase).toBe("finished");
+    expect(summarize(state).correctCount).toBe(QUESTIONS_PER_GAME);
+  });
+
+  it("4 択モードでも二重回答は採点されない", () => {
+    const state = startGame({
+      mode: "infer",
+      difficulty: "easy",
+      questions: getQuestionsForModeAndDifficulty("infer", "easy"),
+      random: zeroRandom,
+    });
+
+    const first = answerCorrectly(state);
+    const second = answer(first, "choice-1");
+    expect(second).toBe(first);
+    expect(second.results).toHaveLength(1);
+  });
+
+  it("モードが状態に保持される", () => {
+    for (const mode of ["duel", "infer", "detective"] as const) {
+      const state = startGame({
+        mode,
+        difficulty: "easy",
+        questions: getQuestionsForModeAndDifficulty(mode, "easy"),
+        random: zeroRandom,
+      });
+      expect(state.mode).toBe(mode);
+      expect(state.questions.every((question) => question.mode === mode)).toBe(true);
+    }
+  });
+
+  it("4 択モードの選択肢は 4 つ", () => {
+    for (const mode of ["infer", "detective"] as const) {
+      const state = startGame({
+        mode,
+        difficulty: "easy",
+        questions: getQuestionsForModeAndDifficulty(mode, "easy"),
+        random: zeroRandom,
+      });
+      expect(currentQuestion(state).choices).toHaveLength(4);
+    }
   });
 });

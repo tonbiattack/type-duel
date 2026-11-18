@@ -2,23 +2,43 @@
  * 問題データのスキーマ・バリデーションのテスト。
  *
  * 仕様書 §6 の要件（ID 一意・選択肢・解説・正答の存在）と、
- * 難易度ごとの問題数を検証する。
+ * モード・難易度ごとの問題数を検証する。
  */
 import { describe, expect, it } from "vitest";
 import {
   allQuestions,
+  detectiveQuestions,
+  duelQuestions,
   getQuestionById,
   getQuestionsForDifficulty,
+  getQuestionsForMode,
+  getQuestionsForModeAndDifficulty,
+  inferQuestions,
   questionsByDifficulty,
+  questionsByMode,
 } from "../src/data/questions";
-import { countByDifficulty, validateQuestion, validateQuestionSet } from "../src/lib/validate";
-import { DIFFICULTIES, DUEL_CHOICE_IDS, type Question } from "../src/types/question";
+import {
+  countByDifficulty,
+  countByMode,
+  validateQuestion,
+  validateQuestionSet,
+} from "../src/lib/validate";
+import {
+  CHOICE_COUNT_BY_MODE,
+  DIFFICULTIES,
+  DUEL_CHOICE_IDS,
+  GAME_MODES,
+  type DetectiveQuestion,
+  type DuelQuestion,
+  type InferQuestion,
+  type Question,
+} from "../src/types/question";
 
 /** 仕様書 §9 が要求する難易度ごとの最低問題数。 */
 const MINIMUM_PER_DIFFICULTY = 15;
 
-/** テスト用の最小構成の問題。 */
-function makeQuestion(overrides: Partial<Question> = {}): Question {
+/** テスト用の Duel 問題。 */
+function makeDuelQuestion(overrides: Partial<DuelQuestion> = {}): DuelQuestion {
   return {
     id: "test-001",
     mode: "duel",
@@ -36,14 +56,63 @@ function makeQuestion(overrides: Partial<Question> = {}): Question {
   };
 }
 
+/** テスト用の Infer 問題。 */
+function makeInferQuestion(overrides: Partial<InferQuestion> = {}): InferQuestion {
+  return {
+    id: "test-infer-001",
+    mode: "infer",
+    difficulty: "easy",
+    topic: ["literal"],
+    prompt: "value の型は？",
+    code: `const value = "hello";`,
+    choices: [
+      { id: "choice-1", label: `"hello"` },
+      { id: "choice-2", label: "string" },
+      { id: "choice-3", label: "any" },
+      { id: "choice-4", label: "unknown" },
+    ],
+    answer: "choice-1",
+    expectedType: `"hello"`,
+    explanation: "テスト解説",
+    ...overrides,
+  };
+}
+
+/** テスト用の Detective 問題。 */
+function makeDetectiveQuestion(overrides: Partial<DetectiveQuestion> = {}): DetectiveQuestion {
+  return {
+    id: "test-detective-001",
+    mode: "detective",
+    difficulty: "easy",
+    topic: ["null"],
+    prompt: "エラーの原因は？",
+    code: `const value: string = null;`,
+    choices: [
+      { id: "choice-1", label: "null は string に代入できない" },
+      { id: "choice-2", label: "null は予約語である" },
+      { id: "choice-3", label: "string は null を許容する" },
+      { id: "choice-4", label: "const では null を使えない" },
+    ],
+    answer: "choice-1",
+    expectedErrorCode: 2322,
+    explanation: "テスト解説",
+    ...overrides,
+  };
+}
+
+/** テスト用の汎用問題（Duel）。 */
+function makeQuestion(overrides: Partial<Question> = {}): Question {
+  return makeDuelQuestion(overrides as Partial<DuelQuestion>);
+}
+
 describe("問題集全体", () => {
   it("バリデーションエラーがない", () => {
     const issues = validateQuestionSet(allQuestions, MINIMUM_PER_DIFFICULTY);
     expect(issues.map((issue) => issue.message)).toEqual([]);
   });
 
-  it("難易度ごとに 15 問以上ある", () => {
-    const counts = countByDifficulty(allQuestions);
+  it("Duel は難易度ごとに 15 問以上ある", () => {
+    const counts = countByDifficulty(duelQuestions);
     for (const difficulty of DIFFICULTIES) {
       expect(counts[difficulty], `${difficulty} の問題数`).toBeGreaterThanOrEqual(
         MINIMUM_PER_DIFFICULTY,
@@ -51,9 +120,18 @@ describe("問題集全体", () => {
     }
   });
 
-  it("10 問を重複なく抽選できるだけの問題数がある", () => {
-    for (const difficulty of DIFFICULTIES) {
-      expect(getQuestionsForDifficulty(difficulty).length).toBeGreaterThanOrEqual(10);
+  it("全モードが 10 問を重複なく抽選できる問題数を持つ", () => {
+    for (const mode of GAME_MODES) {
+      expect(getQuestionsForMode(mode).length, mode).toBeGreaterThanOrEqual(10);
+    }
+  });
+
+  it("Infer と Detective は難易度ごとに 5 問以上ある", () => {
+    for (const mode of ["infer", "detective"] as const) {
+      const counts = countByDifficulty(getQuestionsForMode(mode));
+      for (const difficulty of DIFFICULTIES) {
+        expect(counts[difficulty], `${mode} / ${difficulty}`).toBeGreaterThanOrEqual(5);
+      }
     }
   });
 
@@ -62,13 +140,9 @@ describe("問題集全体", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("全問が duel モード", () => {
-    expect(allQuestions.every((question) => question.mode === "duel")).toBe(true);
-  });
-
-  it("全問に 2 択が設定されている", () => {
+  it("全問の選択肢数がモードの規定と一致する", () => {
     for (const question of allQuestions) {
-      expect(question.choices, question.id).toHaveLength(2);
+      expect(question.choices, question.id).toHaveLength(CHOICE_COUNT_BY_MODE[question.mode]);
     }
   });
 
@@ -86,18 +160,47 @@ describe("問題集全体", () => {
     }
   });
 
-  it("正解の二択が極端に偏っていない", () => {
-    const assignable = allQuestions.filter(
+  it("Duel の正解の二択が極端に偏っていない", () => {
+    const assignable = duelQuestions.filter(
       (question) => question.answer === DUEL_CHOICE_IDS.assignable,
     ).length;
-    const ratio = assignable / allQuestions.length;
+    const ratio = assignable / duelQuestions.length;
     expect(ratio).toBeGreaterThan(0.3);
     expect(ratio).toBeLessThan(0.7);
   });
 
-  it("難易度別の問題集が全体と一致する", () => {
+  it("Infer / Detective の正解位置が偏っていない", () => {
+    for (const mode of ["infer", "detective"] as const) {
+      const positions = getQuestionsForMode(mode).map((question) =>
+        question.choices.findIndex((choice) => choice.id === question.answer),
+      );
+      const counts = new Map<number, number>();
+      for (const position of positions) {
+        counts.set(position, (counts.get(position) ?? 0) + 1);
+      }
+      // 4 択のうち少なくとも 3 つの位置に正解が散っていること
+      expect(
+        counts.size,
+        `${mode} の正解位置: ${[...counts.keys()].join(",")}`,
+      ).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it("難易度別の問題集が Duel 全体と一致する", () => {
     const fromGroups = DIFFICULTIES.flatMap((difficulty) => questionsByDifficulty[difficulty]);
+    expect(fromGroups).toHaveLength(duelQuestions.length);
+  });
+
+  it("モード別の問題集が全体と一致する", () => {
+    const fromGroups = GAME_MODES.flatMap((mode) => questionsByMode[mode]);
     expect(fromGroups).toHaveLength(allQuestions.length);
+  });
+
+  it("モードと難易度の絞り込みが機能する", () => {
+    const filtered = getQuestionsForModeAndDifficulty("infer", "easy");
+    expect(filtered.length).toBeGreaterThan(0);
+    expect(filtered.every((question) => question.mode === "infer")).toBe(true);
+    expect(filtered.every((question) => question.difficulty === "easy")).toBe(true);
   });
 
   it("ID から問題を取得できる", () => {
@@ -108,64 +211,104 @@ describe("問題集全体", () => {
     }
     expect(getQuestionById("存在しない-id")).toBeUndefined();
   });
+
+  it("Infer 問題には expectedType がある", () => {
+    for (const question of inferQuestions) {
+      expect(question.expectedType.length, question.id).toBeGreaterThan(0);
+    }
+  });
+
+  it("Detective 問題には expectedErrorCode がある", () => {
+    for (const question of detectiveQuestions) {
+      expect(Number.isInteger(question.expectedErrorCode), question.id).toBe(true);
+      expect(question.expectedErrorCode, question.id).toBeGreaterThan(0);
+    }
+  });
+
+  it("Detective 問題の多くに修正例がある", () => {
+    const withFix = detectiveQuestions.filter((question) => question.fix !== undefined);
+    expect(withFix.length / detectiveQuestions.length).toBeGreaterThan(0.8);
+  });
 });
 
 describe("validateQuestion", () => {
-  it("正しい問題はエラーなし", () => {
-    expect(validateQuestion(makeQuestion(), 0)).toEqual([]);
+  it("正しい Duel 問題はエラーなし", () => {
+    expect(validateQuestion(makeDuelQuestion(), 0)).toEqual([]);
+  });
+
+  it("正しい Infer 問題はエラーなし", () => {
+    expect(validateQuestion(makeInferQuestion(), 0)).toEqual([]);
+  });
+
+  it("正しい Detective 問題はエラーなし", () => {
+    expect(validateQuestion(makeDetectiveQuestion(), 0)).toEqual([]);
   });
 
   it("id の重複形式を検出する", () => {
-    const issues = validateQuestion(makeQuestion({ id: "Test_001" }), 0);
+    const issues = validateQuestion(makeDuelQuestion({ id: "Test_001" }), 0);
     expect(issues.length).toBeGreaterThan(0);
   });
 
   it("空の id を検出する", () => {
-    expect(validateQuestion(makeQuestion({ id: "" }), 0).length).toBeGreaterThan(0);
+    expect(validateQuestion(makeDuelQuestion({ id: "" }), 0).length).toBeGreaterThan(0);
   });
 
-  it("duel 以外のモードを検出する", () => {
-    const issues = validateQuestion(makeQuestion({ mode: "infer" }), 0);
+  it("不正なモードを検出する", () => {
+    const issues = validateQuestion(makeDuelQuestion({ mode: "unknown" as never }), 0);
     expect(issues.some((issue) => issue.message.includes("mode"))).toBe(true);
   });
 
   it("不正な難易度を検出する", () => {
-    const issues = validateQuestion(makeQuestion({ difficulty: "expert" as never }), 0);
+    const issues = validateQuestion(makeDuelQuestion({ difficulty: "expert" as never }), 0);
     expect(issues.some((issue) => issue.message.includes("difficulty"))).toBe(true);
   });
 
   it("空の prompt を検出する", () => {
-    expect(validateQuestion(makeQuestion({ prompt: "  " }), 0).length).toBeGreaterThan(0);
+    expect(validateQuestion(makeDuelQuestion({ prompt: "  " }), 0).length).toBeGreaterThan(0);
   });
 
   it("空の code を検出する", () => {
-    expect(validateQuestion(makeQuestion({ code: "" }), 0).length).toBeGreaterThan(0);
+    expect(validateQuestion(makeDuelQuestion({ code: "" }), 0).length).toBeGreaterThan(0);
   });
 
   it("空の explanation を検出する", () => {
-    expect(validateQuestion(makeQuestion({ explanation: "" }), 0).length).toBeGreaterThan(0);
+    expect(validateQuestion(makeDuelQuestion({ explanation: "" }), 0).length).toBeGreaterThan(0);
   });
 
   it("空の topic を検出する", () => {
-    expect(validateQuestion(makeQuestion({ topic: [] }), 0).length).toBeGreaterThan(0);
+    expect(validateQuestion(makeDuelQuestion({ topic: [] }), 0).length).toBeGreaterThan(0);
   });
 
-  it("選択肢が 1 つだけならエラー", () => {
+  it("Duel の選択肢が 1 つだけならエラー", () => {
     const issues = validateQuestion(
-      makeQuestion({ choices: [{ id: DUEL_CHOICE_IDS.assignable, label: "代入できる" }] }),
+      makeDuelQuestion({ choices: [{ id: DUEL_CHOICE_IDS.assignable, label: "代入できる" }] }),
       0,
     );
     expect(issues.length).toBeGreaterThan(0);
   });
 
+  it("Infer の選択肢が 3 つならエラー", () => {
+    const issues = validateQuestion(
+      makeInferQuestion({
+        choices: [
+          { id: "choice-1", label: `"hello"` },
+          { id: "choice-2", label: "string" },
+          { id: "choice-3", label: "any" },
+        ],
+      }),
+      0,
+    );
+    expect(issues.some((issue) => issue.message.includes("4"))).toBe(true);
+  });
+
   it("answer が choices にない場合を検出する", () => {
-    const issues = validateQuestion(makeQuestion({ answer: "unknown-choice" }), 0);
+    const issues = validateQuestion(makeDuelQuestion({ answer: "unknown-choice" }), 0);
     expect(issues.some((issue) => issue.message.includes("answer"))).toBe(true);
   });
 
   it("選択肢 ID の重複を検出する", () => {
     const issues = validateQuestion(
-      makeQuestion({
+      makeDuelQuestion({
         choices: [
           { id: DUEL_CHOICE_IDS.assignable, label: "A" },
           { id: DUEL_CHOICE_IDS.assignable, label: "B" },
@@ -176,9 +319,24 @@ describe("validateQuestion", () => {
     expect(issues.some((issue) => issue.message.includes("重複"))).toBe(true);
   });
 
+  it("選択肢ラベルの重複を検出する", () => {
+    const issues = validateQuestion(
+      makeInferQuestion({
+        choices: [
+          { id: "choice-1", label: "string" },
+          { id: "choice-2", label: "string" },
+          { id: "choice-3", label: "any" },
+          { id: "choice-4", label: "unknown" },
+        ],
+      }),
+      0,
+    );
+    expect(issues.some((issue) => issue.message.includes("label"))).toBe(true);
+  });
+
   it("空の選択肢ラベルを検出する", () => {
     const issues = validateQuestion(
-      makeQuestion({
+      makeDuelQuestion({
         choices: [
           { id: DUEL_CHOICE_IDS.assignable, label: "" },
           { id: DUEL_CHOICE_IDS.notAssignable, label: "代入できない" },
@@ -189,10 +347,25 @@ describe("validateQuestion", () => {
     expect(issues.length).toBeGreaterThan(0);
   });
 
+  it("Infer の expectedType 欠落を検出する", () => {
+    const issues = validateQuestion(makeInferQuestion({ expectedType: "" }), 0);
+    expect(issues.some((issue) => issue.message.includes("expectedType"))).toBe(true);
+  });
+
+  it("Detective の expectedErrorCode 欠落を検出する", () => {
+    const issues = validateQuestion(makeDetectiveQuestion({ expectedErrorCode: 0 }), 0);
+    expect(issues.some((issue) => issue.message.includes("expectedErrorCode"))).toBe(true);
+  });
+
+  it("Detective の空の fix を検出する", () => {
+    const issues = validateQuestion(makeDetectiveQuestion({ fix: "  " }), 0);
+    expect(issues.some((issue) => issue.message.includes("fix"))).toBe(true);
+  });
+
   it("範囲外の timeLimitSec を検出する", () => {
-    expect(validateQuestion(makeQuestion({ timeLimitSec: 1 }), 0).length).toBeGreaterThan(0);
-    expect(validateQuestion(makeQuestion({ timeLimitSec: 999 }), 0).length).toBeGreaterThan(0);
-    expect(validateQuestion(makeQuestion({ timeLimitSec: 20 }), 0)).toEqual([]);
+    expect(validateQuestion(makeDuelQuestion({ timeLimitSec: 1 }), 0).length).toBeGreaterThan(0);
+    expect(validateQuestion(makeDuelQuestion({ timeLimitSec: 999 }), 0).length).toBeGreaterThan(0);
+    expect(validateQuestion(makeDuelQuestion({ timeLimitSec: 20 }), 0)).toEqual([]);
   });
 });
 
@@ -215,10 +388,30 @@ describe("validateQuestionSet", () => {
 describe("countByDifficulty", () => {
   it("難易度ごとに数える", () => {
     const counts = countByDifficulty([
-      makeQuestion({ id: "a-1", difficulty: "easy" }),
-      makeQuestion({ id: "a-2", difficulty: "easy" }),
-      makeQuestion({ id: "b-1", difficulty: "normal" }),
+      makeDuelQuestion({ id: "a-1", difficulty: "easy" }),
+      makeDuelQuestion({ id: "a-2", difficulty: "easy" }),
+      makeDuelQuestion({ id: "b-1", difficulty: "normal" }),
     ]);
     expect(counts).toEqual({ easy: 2, normal: 1, hard: 0 });
+  });
+});
+
+describe("countByMode", () => {
+  it("モードごとに数える", () => {
+    const counts = countByMode([
+      makeDuelQuestion({ id: "a-1" }),
+      makeInferQuestion({ id: "b-1" }),
+      makeInferQuestion({ id: "b-2" }),
+      makeDetectiveQuestion({ id: "c-1" }),
+    ]);
+    expect(counts).toEqual({ duel: 1, infer: 2, detective: 1 });
+  });
+});
+
+describe("getQuestionsForDifficulty", () => {
+  it("Duel の問題を難易度で絞り込む", () => {
+    const easy = getQuestionsForDifficulty("easy");
+    expect(easy.length).toBeGreaterThan(0);
+    expect(easy.every((question) => question.difficulty === "easy")).toBe(true);
   });
 });

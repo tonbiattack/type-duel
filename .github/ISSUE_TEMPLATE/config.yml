@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: セキュリティ上の問題
+    url: https://github.com/tonbiattack/type-duel/security/advisories/new
+    about: 脆弱性は公開 Issue ではなく、こちらから非公開で報告してください
+  - name: 遊びかた・仕様
+    url: https://github.com/tonbiattack/type-duel/blob/main/docs/SPEC.md
+    about: 仕様書はこちら

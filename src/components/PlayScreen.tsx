@@ -1,8 +1,9 @@
-import { DIFFICULTY_LABELS } from "../types/question";
+import { DIFFICULTY_LABELS, MODE_LABELS } from "../types/question";
 import { currentQuestion, isAnswered, isLastQuestion, type GameState } from "../lib/game";
 import { ChoiceButtons } from "./ChoiceButtons";
 import { CodeBlock } from "./CodeBlock";
 import { Explanation } from "./Explanation";
+import { RichText } from "./RichText";
 import { Timer } from "./Timer";
 
 type PlayScreenProps = {
@@ -16,7 +17,7 @@ type PlayScreenProps = {
 /**
  * プレイ画面。
  *
- * 問題文・コード・タイマー・進捗・二択ボタンを 1 画面に収める。
+ * 問題文・コード・タイマー・進捗・回答ボタンを 1 画面に収める。
  * 回答後は解説を差し込み、同じ問題への再回答を防ぐ。
  */
 export function PlayScreen({
@@ -30,11 +31,13 @@ export function PlayScreen({
   const answered = isAnswered(state);
   const result = state.results[state.results.length - 1];
   const showExplanation = state.phase === "revealed" && result !== undefined;
+  const choiceCount = question.choices.length;
 
   return (
     <div className="screen screen-play">
       <header className="play-head">
         <div className="play-meta">
+          <span className={`play-mode play-mode-${state.mode}`}>{MODE_LABELS[state.mode]}</span>
           <span className="play-difficulty">{DIFFICULTY_LABELS[state.difficulty]}</span>
           <span
             className="play-progress"
@@ -75,7 +78,9 @@ export function PlayScreen({
       />
 
       <main className="play-main">
-        <p className="question-prompt">{question.prompt}</p>
+        <p className="question-prompt">
+          <RichText text={question.prompt} />
+        </p>
         <CodeBlock code={question.code} label="判定する TypeScript コード" />
 
         <ChoiceButtons
@@ -95,7 +100,15 @@ export function PlayScreen({
           />
         ) : (
           <p className="play-hint">
-            <kbd>1</kbd> 代入できる / <kbd>2</kbd> 代入できない
+            {choiceCount === 2 ? (
+              <>
+                <kbd>1</kbd> 代入できる / <kbd>2</kbd> 代入できない
+              </>
+            ) : (
+              <>
+                <kbd>1</kbd>〜<kbd>{choiceCount}</kbd> キーで回答
+              </>
+            )}
           </p>
         )}
       </main>

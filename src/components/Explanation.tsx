@@ -1,5 +1,7 @@
 import type { QuestionResult } from "../lib/game";
 import type { Question } from "../types/question";
+import { CodeBlock } from "./CodeBlock";
+import { RichText } from "./RichText";
 
 type ExplanationProps = {
   question: Question;
@@ -12,6 +14,7 @@ type ExplanationProps = {
  * 正誤と解説の表示。
  *
  * 色に頼らず「正解」「不正解」「時間切れ」を明示する。
+ * Detective では修正例、Infer では推論された型も併せて示す。
  * 「次へ」ボタンは自動フォーカスし、Enter で進めるようにする。
  */
 export function Explanation({
@@ -37,7 +40,24 @@ export function Explanation({
           <span className="gained is-zero">+0 点</span>
         )}
       </div>
-      <p className="explanation-text">{question.explanation}</p>
+
+      {question.mode === "infer" ? (
+        <p className="explanation-answer">
+          推論される型: <code className="inline-code">{question.expectedType}</code>
+        </p>
+      ) : null}
+
+      <p className="explanation-text">
+        <RichText text={question.explanation} />
+      </p>
+
+      {question.mode === "detective" && question.fix !== undefined ? (
+        <div className="explanation-fix">
+          <p className="explanation-fix-label">修正例</p>
+          <CodeBlock code={question.fix} label="修正例のコード" />
+        </div>
+      ) : null}
+
       <div className="explanation-actions">
         <button type="button" className="button button-primary" onClick={onNext} autoFocus>
           {isLast ? "結果を見る" : "次の問題へ"}

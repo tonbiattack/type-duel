@@ -1,29 +1,62 @@
 /**
  * 問題集のエントリポイント。
  *
- * 問題を追加するときは難易度別ファイル（`easy.ts` / `normal.ts` / `hard.ts`）に
- * `duelQuestion(...)` を 1 つ足すだけでよい。検証は `tests/questions.test.ts` が行う。
+ * 問題を追加するときはモード・難易度別のファイルに
+ * `duelQuestion(...)` / `inferQuestion(...)` / `detectiveQuestion(...)` を
+ * 1 つ足すだけでよい。検証は `tests/questions.test.ts` が行う。
  */
-import type { Difficulty, Question } from "../../types/question";
+import type { Difficulty, GameMode, Question } from "../../types/question";
+import { detectiveQuestions } from "./detective";
 import { easyQuestions } from "./easy";
 import { hardQuestions } from "./hard";
+import { inferQuestions } from "./infer";
 import { normalQuestions } from "./normal";
 
-/** 全問題（難易度順）。 */
-export const allQuestions: readonly Question[] = [
+export { detectiveQuestions, inferQuestions };
+export { easyQuestions, hardQuestions, normalQuestions };
+
+/** Duel の全問題（難易度順）。 */
+export const duelQuestions: readonly Question[] = [
   ...easyQuestions,
   ...normalQuestions,
   ...hardQuestions,
 ];
 
-/** 難易度ごとの問題集。 */
+/** 全モードの全問題。 */
+export const allQuestions: readonly Question[] = [
+  ...duelQuestions,
+  ...inferQuestions,
+  ...detectiveQuestions,
+];
+
+/** モードごとの問題集。 */
+export const questionsByMode: Record<GameMode, readonly Question[]> = {
+  duel: duelQuestions,
+  infer: inferQuestions,
+  detective: detectiveQuestions,
+};
+
+/** 難易度ごとの Duel 問題集。 */
 export const questionsByDifficulty: Record<Difficulty, readonly Question[]> = {
   easy: easyQuestions,
   normal: normalQuestions,
   hard: hardQuestions,
 };
 
-/** 難易度を指定して問題を取得する。 */
+/** モードを指定して問題を取得する。 */
+export function getQuestionsForMode(mode: GameMode): readonly Question[] {
+  return questionsByMode[mode];
+}
+
+/** モードと難易度を指定して問題を取得する。 */
+export function getQuestionsForModeAndDifficulty(
+  mode: GameMode,
+  difficulty: Difficulty,
+): readonly Question[] {
+  return questionsByMode[mode].filter((question) => question.difficulty === difficulty);
+}
+
+/** 難易度を指定して Duel の問題を取得する（後方互換）。 */
 export function getQuestionsForDifficulty(difficulty: Difficulty): readonly Question[] {
   return questionsByDifficulty[difficulty];
 }
