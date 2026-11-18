@@ -1,36 +1,85 @@
----
 name: バグ報告
-about: 期待どおりに動かない箇所を報告する
+description: 期待どおりに動かない箇所を報告する
 title: "[Bug] "
 labels: bug
----
-
-## 概要
-
-<!-- 何が起きているかを 1〜2 文で -->
-
-## 再現手順
-
-1.
-2.
-3.
-
-## 期待する動作
-
-<!-- 本来どうなるべきか -->
-
-## 実際の動作
-
-<!-- 実際に何が起きたか。エラーメッセージがあれば貼る -->
-
-## 環境
-
-- モード: <!-- Duel / Infer / Detective -->
-- 難易度: <!-- Easy / Normal / Hard -->
-- ブラウザ:
-- OS:
-- 端末: <!-- PC / スマートフォン -->
-
-## 補足
-
-<!-- スクリーンショットや、問題 ID が分かれば記載 -->
+body:
+  - type: markdown
+    attributes:
+      value: |
+        バグ報告ありがとうございます。再現手順があると調査が早く進みます。
+  - type: textarea
+    id: summary
+    attributes:
+      label: 概要
+      description: 何が起きているかを 1〜2 文で
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 再現手順
+      placeholder: |
+        1. タイトル画面で Infer / Easy を選ぶ
+        2. 1 問目に「1」キーで回答する
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期待する動作
+      description: 本来どうなるべきか
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 実際の動作
+      description: 実際に何が起きたか。エラーメッセージがあれば貼ってください
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: モード
+      options:
+        - Duel
+        - Infer
+        - Detective
+        - タイトル画面
+        - 結果画面
+        - 不明
+    validations:
+      required: true
+  - type: dropdown
+    id: difficulty
+    attributes:
+      label: 難易度
+      options:
+        - Easy
+        - Normal
+        - Hard
+        - 不明
+    validations:
+      required: false
+  - type: input
+    id: browser
+    attributes:
+      label: ブラウザ
+      placeholder: "例: Chrome 131 / Safari 18"
+    validations:
+      required: false
+  - type: input
+    id: os
+    attributes:
+      label: OS・端末
+      placeholder: "例: Windows 11 / iPhone 15 (iOS 18)"
+    validations:
+      required: false
+  - type: textarea
+    id: notes
+    attributes:
+      label: 補足
+      description: スクリーンショットや、問題 ID が分かれば記載してください
+    validations:
+      required: false
