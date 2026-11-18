@@ -167,6 +167,136 @@ body {
   grid-template-columns: 1fr;
 }
 
+/* モード選択 */
+
+.mode-list {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: 1fr;
+}
+
+.mode-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.mode-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.mode-name {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.mode-duel .mode-name {
+  color: var(--accent);
+}
+
+.mode-infer .mode-name {
+  color: var(--correct);
+}
+
+.mode-detective .mode-name {
+  color: var(--warning);
+}
+
+.mode-count {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.mode-tagline {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.mode-description {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.7;
+}
+
+.mode-difficulties {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.difficulty-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 52px;
+  padding: var(--space-2);
+  background: var(--bg-elevated-2);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    transform 120ms ease;
+  touch-action: manipulation;
+}
+
+.difficulty-button:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+.difficulty-button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.difficulty-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.difficulty-button-label {
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.difficulty-button-count {
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.difficulty-button.difficulty-easy .difficulty-button-label {
+  color: var(--correct);
+}
+
+.difficulty-button.difficulty-normal .difficulty-button-label {
+  color: var(--accent);
+}
+
+.difficulty-button.difficulty-hard .difficulty-button-label {
+  color: var(--warning);
+}
+
 .difficulty-card {
   display: grid;
   gap: var(--space-1);
@@ -284,6 +414,30 @@ kbd {
   font-weight: 700;
   letter-spacing: 0.06em;
   white-space: nowrap;
+}
+
+.play-mode {
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.play-mode-duel {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.play-mode-infer {
+  background: var(--correct-soft);
+  color: var(--correct);
+}
+
+.play-mode-detective {
+  background: rgba(255, 200, 87, 0.14);
+  color: var(--warning);
 }
 
 .play-progress {
@@ -472,6 +626,23 @@ kbd {
   grid-template-columns: 1fr;
 }
 
+/* 4 択（Infer / Detective）は縦積みで読みやすさを優先する */
+.choices-compact {
+  gap: var(--space-2);
+}
+
+.choices-compact .choice {
+  min-height: 56px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.choices-compact .choice-label {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+}
+
 .choice {
   display: flex;
   align-items: center;
@@ -616,6 +787,41 @@ kbd {
   line-height: 1.75;
 }
 
+.explanation-answer {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.inline-code {
+  padding: 0.1em 0.4em;
+  border-radius: 5px;
+  background: var(--bg-elevated-2);
+  border: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  color: var(--tok-type);
+}
+
+.explanation-fix {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.explanation-fix-label {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.explanation-fix .code-block {
+  font-size: 0.82rem;
+  padding: var(--space-3);
+}
+
 .explanation-actions {
   display: flex;
   justify-content: flex-end;
@@ -672,12 +878,36 @@ kbd {
 }
 
 .result-difficulty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
   margin: 0;
   color: var(--accent);
   font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.result-mode {
+  font-weight: 800;
+}
+
+.result-mode-duel {
+  color: var(--accent);
+}
+
+.result-mode-infer {
+  color: var(--correct);
+}
+
+.result-mode-detective {
+  color: var(--warning);
+}
+
+.result-difficulty-sep {
+  color: var(--text-dim);
 }
 
 .result-title {
@@ -880,8 +1110,17 @@ kbd {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .mode-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .choices {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* 4 択は 1 列のまま（長い型表記を折り返さない） */
+  .choices-compact {
+    grid-template-columns: 1fr;
   }
 
   .result-stats {

@@ -1,4 +1,4 @@
-import { DIFFICULTY_LABELS } from "../types/question";
+import { DIFFICULTY_LABELS, MODE_LABELS } from "../types/question";
 import { formatAccuracy, summarize, type GameState } from "../lib/game";
 
 type ResultScreenProps = {
@@ -22,7 +22,11 @@ export function ResultScreen({
   return (
     <div className="screen screen-result">
       <header className="result-head">
-        <p className="result-difficulty">{DIFFICULTY_LABELS[state.difficulty]}</p>
+        <p className="result-difficulty">
+          <span className={`result-mode result-mode-${state.mode}`}>{MODE_LABELS[state.mode]}</span>
+          <span className="result-difficulty-sep">/</span>
+          {DIFFICULTY_LABELS[state.difficulty]}
+        </p>
         <h1 className="result-title">結果</h1>
       </header>
 

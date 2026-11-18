@@ -5,7 +5,15 @@
  * 実行時とテストの両方から検出する。問題を追加したら
  * `tests/questions.test.ts` が自動的に検証する。
  */
-import { DIFFICULTIES, DUEL_CHOICE_IDS, type Difficulty, type Question } from "../types/question";
+import {
+  CHOICE_COUNT_BY_MODE,
+  DIFFICULTIES,
+  DUEL_CHOICE_IDS,
+  GAME_MODES,
+  type Difficulty,
+  type GameMode,
+  type Question,
+} from "../types/question";
 
 /** バリデーション結果の 1 件。 */
 export type ValidationIssue = {
@@ -53,8 +61,8 @@ export function validateQuestion(question: Question, index: number): ValidationI
     push(`id "${question.id}" は kebab-case（英小文字・数字・ハイフン）にしてください`);
   }
 
-  if (question.mode !== "duel") {
-    push(`mode は "duel" を指定してください（実際: ${String(question.mode)}）`);
+  if (!GAME_MODES.includes(question.mode)) {
+    push(`mode が不正です（実際: ${String(question.mode)}）`);
   }
 
   if (!DIFFICULTIES.includes(question.difficulty)) {
@@ -79,8 +87,15 @@ export function validateQuestion(question: Question, index: number): ValidationI
     push("explanation が空です");
   }
 
-  if (!Array.isArray(question.choices) || question.choices.length < 2) {
-    push("choices は 2 つ以上必要です");
+  // モードごとの選択肢数
+  const expectedChoiceCount = CHOICE_COUNT_BY_MODE[question.mode] ?? 2;
+
+  if (!Array.isArray(question.choices) || question.choices.length !== expectedChoiceCount) {
+    push(
+      `choices は ${question.mode} では ${expectedChoiceCount} 個必要です（実際: ${
+        Array.isArray(question.choices) ? question.choices.length : 0
+      }）`,
+    );
   } else {
     const seen = new Set<string>();
     for (const choice of question.choices) {
@@ -104,6 +119,28 @@ export function validateQuestion(question: Question, index: number): ValidationI
       push("answer が空です");
     } else if (!seen.has(question.answer)) {
       push(`answer "${question.answer}" が choices に存在しません`);
+    }
+
+    // 選択肢ラベルの重複は「正解が一意でない」ことを意味する
+    const labels = question.choices.map((choice) => choice.label.trim());
+    if (new Set(labels).size !== labels.length) {
+      push("choices の label が重複しています（正解が一意になりません）");
+    }
+  }
+
+  // モード固有の検証
+  if (question.mode === "infer") {
+    if (!isNonEmptyString(question.expectedType)) {
+      push("infer モードでは expectedType が必要です");
+    }
+  }
+
+  if (question.mode === "detective") {
+    if (!Number.isInteger(question.expectedErrorCode) || question.expectedErrorCode <= 0) {
+      push("detective モードでは expectedErrorCode（正の整数）が必要です");
+    }
+    if (question.fix !== undefined && !isNonEmptyString(question.fix)) {
+      push("fix を指定する場合は空にできません");
     }
   }
 
@@ -171,6 +208,17 @@ export function countByDifficulty(questions: readonly Question[]): Record<Diffic
   for (const question of questions) {
     if (DIFFICULTIES.includes(question.difficulty)) {
       counts[question.difficulty] += 1;
+    }
+  }
+  return counts;
+}
+
+/** モードごとの問題数を数える。 */
+export function countByMode(questions: readonly Question[]): Record<GameMode, number> {
+  const counts: Record<GameMode, number> = { duel: 0, infer: 0, detective: 0 };
+  for (const question of questions) {
+    if (GAME_MODES.includes(question.mode)) {
+      counts[question.mode] += 1;
     }
   }
   return counts;

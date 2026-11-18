@@ -12,8 +12,9 @@ type ChoiceButtonsProps = {
 };
 
 /**
- * 二択の回答ボタン。
+ * 回答ボタン。
  *
+ * 2 択（Duel）と 4 択（Infer / Detective）の両方を扱う。
  * 回答後は全ボタンを無効化して二重送信を防ぐ。
  * 正誤は色だけでなく「正解」「不正解」のテキストでも示す。
  */
@@ -25,9 +26,14 @@ export function ChoiceButtons({
   onSelect,
 }: ChoiceButtonsProps): React.JSX.Element {
   const revealed = answerId !== null;
+  const isCompact = choices.length > 2;
 
   return (
-    <div className="choices" role="group" aria-label="回答を選ぶ">
+    <div
+      className={`choices${isCompact ? " choices-compact" : ""}`}
+      role="group"
+      aria-label="回答を選ぶ"
+    >
       {choices.map((choice, index) => {
         const isSelected = selectedChoiceId === choice.id;
         const isAnswer = answerId === choice.id;

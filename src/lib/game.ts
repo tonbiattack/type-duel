@@ -5,7 +5,7 @@
  * これにより「二重回答」「時間切れ」「最終問題」などの境界を
  * `tests/game.test.ts` で直接検証できる。
  */
-import type { Difficulty, Question } from "../types/question";
+import type { Difficulty, GameMode, Question } from "../types/question";
 import {
   BASE_SCORE,
   DEFAULT_TIME_LIMIT_SEC,
@@ -32,6 +32,7 @@ export type QuestionResult = {
 
 /** ゲーム全体の状態。 */
 export type GameState = {
+  mode: GameMode;
   difficulty: Difficulty;
   /** 出題順に並んだ問題。 */
   questions: readonly Question[];
@@ -58,6 +59,7 @@ export type GameState = {
 
 /** ゲーム開始に必要な入力。 */
 export type StartGameInput = {
+  mode: GameMode;
   difficulty: Difficulty;
   questions: readonly Question[];
   /** 抽選に使う乱数（テストで固定するため注入可能）。 */
@@ -110,6 +112,7 @@ export function startGame(input: StartGameInput): GameState {
   }
 
   return {
+    mode: input.mode,
     difficulty: input.difficulty,
     questions,
     index: 0,

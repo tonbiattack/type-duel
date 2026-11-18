@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { PlayScreen } from "./components/PlayScreen";
 import { ResultScreen } from "./components/ResultScreen";
 import { TitleScreen } from "./components/TitleScreen";
-import { getQuestionsForDifficulty } from "./data/questions";
+import { getQuestionsForModeAndDifficulty } from "./data/questions";
 import { TIMER_TICK_MS } from "./lib/config";
 import {
   answer as answerQuestion,
@@ -12,10 +12,13 @@ import {
   togglePause as togglePauseGame,
   type GameState,
 } from "./lib/game";
-import type { Difficulty } from "./types/question";
+import type { Difficulty, GameMode } from "./types/question";
 
 /** 画面遷移。 */
 type Screen = "title" | "play" | "result";
+
+/** 直前に選んだモードと難易度（リトライ用）。 */
+type Selection = { mode: GameMode; difficulty: Difficulty };
 
 /**
  * アプリのルート。
@@ -26,21 +29,24 @@ type Screen = "title" | "play" | "result";
 export function App(): React.JSX.Element {
   const [screen, setScreen] = useState<Screen>("title");
   const [game, setGame] = useState<GameState | null>(null);
-  const [lastDifficulty, setLastDifficulty] = useState<Difficulty>("easy");
+  const [lastSelection, setLastSelection] = useState<Selection>({
+    mode: "duel",
+    difficulty: "easy",
+  });
 
   /** タイマーの経過時間計算用。 */
   const lastTickRef = useRef<number>(0);
 
-  const start = useCallback((difficulty: Difficulty) => {
-    const questions = getQuestionsForDifficulty(difficulty);
-    setLastDifficulty(difficulty);
-    setGame(startGame({ difficulty, questions }));
+  const start = useCallback((mode: GameMode, difficulty: Difficulty) => {
+    const questions = getQuestionsForModeAndDifficulty(mode, difficulty);
+    setLastSelection({ mode, difficulty });
+    setGame(startGame({ mode, difficulty, questions }));
     setScreen("play");
   }, []);
 
   const retry = useCallback(() => {
-    start(lastDifficulty);
-  }, [lastDifficulty, start]);
+    start(lastSelection.mode, lastSelection.difficulty);
+  }, [lastSelection, start]);
 
   const backToTitle = useCallback(() => {
     setGame(null);
@@ -97,7 +103,7 @@ export function App(): React.JSX.Element {
     };
   }, [timerActive, timerKey]);
 
-  // キーボード操作: 1/2 で回答、Enter で次へ、Esc でポーズ。
+  // キーボード操作: 1〜4 で回答、Enter で次へ、Esc でポーズ。
   useEffect(() => {
     if (screen !== "play" || game === null) {
       return;
@@ -122,9 +128,9 @@ export function App(): React.JSX.Element {
         if (question === undefined) {
           return;
         }
-        const choiceIndex = event.key === "1" ? 0 : event.key === "2" ? 1 : -1;
-        if (choiceIndex >= 0) {
-          const choice = question.choices[choiceIndex];
+        const digit = Number.parseInt(event.key, 10);
+        if (Number.isInteger(digit) && digit >= 1 && digit <= question.choices.length) {
+          const choice = question.choices[digit - 1];
           if (choice !== undefined) {
             event.preventDefault();
             handleAnswer(choice.id);

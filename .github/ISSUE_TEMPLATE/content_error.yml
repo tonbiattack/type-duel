@@ -1,0 +1,56 @@
+name: 問題の誤り
+description: 問題文・正答・解説の誤りを報告する
+title: "[Content] "
+labels: content
+body:
+  - type: markdown
+    attributes:
+      value: |
+        問題データの誤りを報告していただきありがとうございます。
+        正答は TypeScript Compiler API で検証していますが、解説の不正確さや
+        問題文の分かりにくさは人手で確認する必要があります。
+  - type: input
+    id: question-id
+    attributes:
+      label: 問題 ID
+      description: プレイ中に確認できる ID、または問題文の冒頭
+      placeholder: "例: easy-literal-to-string"
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: モード
+      options:
+        - Duel
+        - Infer
+        - Detective
+        - 不明
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: 誤りの種類
+      options:
+        - 正答が間違っている
+        - 解説が不正確
+        - 問題文が分かりにくい
+        - 選択肢が不適切
+        - その他
+    validations:
+      required: true
+  - type: textarea
+    id: detail
+    attributes:
+      label: 詳細
+      description: どこがどう誤っているか、正しくはどうなるかを書いてください
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 根拠（任意）
+      description: TypeScript Playground のリンクや、コンパイラの出力など
+    validations:
+      required: false
