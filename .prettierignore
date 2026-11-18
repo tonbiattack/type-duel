@@ -1,0 +1,9 @@
+node_modules
+dist
+coverage
+package-lock.json
+*.log
+
+# 既存ドキュメントは整形対象外（差分を実装に限定する）
+docs/
+README.md
