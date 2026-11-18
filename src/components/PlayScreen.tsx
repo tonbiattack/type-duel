@@ -19,6 +19,9 @@ type PlayScreenProps = {
  *
  * 問題文・コード・タイマー・進捗・回答ボタンを 1 画面に収める。
  * 回答後は解説を差し込み、同じ問題への再回答を防ぐ。
+ *
+ * タイムアタックでは解説を出さず、正誤だけを短く示して自動で次へ進む
+ * （テンポを止めないため。解説は結果画面からまとめて確認できる）。
  */
 export function PlayScreen({
   state,
@@ -30,22 +33,41 @@ export function PlayScreen({
   const question = currentQuestion(state);
   const answered = isAnswered(state);
   const result = state.results[state.results.length - 1];
+  const isTimeAttack = state.format === "timeAttack";
   const showExplanation = state.phase === "revealed" && result !== undefined;
+  const showFeedback = state.phase === "feedback" && result !== undefined;
   const choiceCount = question.choices.length;
 
   return (
-    <div className="screen screen-play">
+    <div className={`screen screen-play${isTimeAttack ? " is-time-attack" : ""}`}>
       <header className="play-head">
         <div className="play-meta">
           <span className={`play-mode play-mode-${state.mode}`}>{MODE_LABELS[state.mode]}</span>
-          <span className="play-difficulty">{DIFFICULTY_LABELS[state.difficulty]}</span>
+          {isTimeAttack ? (
+            <span className="play-mode play-mode-timeattack">タイムアタック</span>
+          ) : (
+            <span className="play-difficulty">{DIFFICULTY_LABELS[state.difficulty]}</span>
+          )}
           <span
             className="play-progress"
-            aria-label={`${state.index + 1} 問目 / 全 ${state.questions.length} 問`}
+            aria-label={
+              isTimeAttack
+                ? `${state.results.length} 問回答済み`
+                : `${state.index + 1} 問目 / 全 ${state.questions.length} 問`
+            }
           >
-            <strong>{state.index + 1}</strong>
-            <span className="play-progress-sep">/</span>
-            {state.questions.length}
+            {isTimeAttack ? (
+              <>
+                <strong>{state.results.length}</strong>
+                <span className="play-progress-sep">問</span>
+              </>
+            ) : (
+              <>
+                <strong>{state.index + 1}</strong>
+                <span className="play-progress-sep">/</span>
+                {state.questions.length}
+              </>
+            )}
           </span>
         </div>
         <div className="play-score">
@@ -75,6 +97,8 @@ export function PlayScreen({
         remainingMs={state.remainingMs}
         timeLimitMs={state.timeLimitMs}
         paused={state.paused}
+        label="残り時間"
+        hidden={!state.timeLimitEnabled}
       />
 
       <main className="play-main">
@@ -91,14 +115,26 @@ export function PlayScreen({
           onSelect={onAnswer}
         />
 
-        {showExplanation ? (
+        {showFeedback && result !== undefined ? (
+          <p
+            className={`play-feedback ${result.correct ? "is-correct" : "is-wrong"}`}
+            aria-live="polite"
+          >
+            {result.correct ? "正解" : result.timedOut ? "時間切れ" : "不正解"}
+            {result.correct ? <span className="play-feedback-score">+{result.score}</span> : null}
+          </p>
+        ) : null}
+
+        {showExplanation && result !== undefined ? (
           <Explanation
             question={question}
             result={result}
             isLast={isLastQuestion(state)}
             onNext={onNext}
           />
-        ) : (
+        ) : null}
+
+        {!answered ? (
           <p className="play-hint">
             {choiceCount === 2 ? (
               <>
@@ -110,7 +146,7 @@ export function PlayScreen({
               </>
             )}
           </p>
-        )}
+        ) : null}
       </main>
 
       {state.paused ? (

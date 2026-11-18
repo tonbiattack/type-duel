@@ -3,6 +3,9 @@
  *
  * 選択肢と正答の対応がずれないよう、正解の選択肢 ID を明示的に受け取り、
  * 選択肢一覧に存在することを型と実行時の両方で担保する。
+ *
+ * 任意項目（段階解説・制限時間・タイムアタック可否）は
+ * `exactOptionalPropertyTypes` に対応するため、指定時だけ代入する。
  */
 import {
   DUEL_CHOICE_IDS,
@@ -10,12 +13,36 @@ import {
   type DetectiveQuestion,
   type Difficulty,
   type DuelQuestion,
+  type ExplanationStep,
   type InferQuestion,
   type Question,
 } from "../../types/question";
 
+/** 全モード共通の任意項目。 */
+type CommonOptionalInput = {
+  /** 段階解説。指定すると 1 ステップずつ開ける UI が使える。 */
+  explanationSteps?: readonly ExplanationStep[];
+  /** 個別の制限時間（秒）。 */
+  timeLimitSec?: number;
+  /** タイムアタックで出題してよいか。 */
+  timeAttackEligible?: boolean;
+};
+
+/** 任意項目を問題データへ反映する。 */
+function applyOptional(question: Question, input: CommonOptionalInput): void {
+  if (input.explanationSteps !== undefined) {
+    question.explanationSteps = input.explanationSteps.map((step) => ({ ...step }));
+  }
+  if (input.timeLimitSec !== undefined) {
+    question.timeLimitSec = input.timeLimitSec;
+  }
+  if (input.timeAttackEligible !== undefined) {
+    question.timeAttackEligible = input.timeAttackEligible;
+  }
+}
+
 /** Duel 問題の入力。 */
-export type DuelQuestionInput = {
+export type DuelQuestionInput = CommonOptionalInput & {
   id: string;
   difficulty: Difficulty;
   topic: string[];
@@ -26,7 +53,6 @@ export type DuelQuestionInput = {
   /** `const result: B = value;` が型検査を通るなら true。 */
   assignable: boolean;
   explanation: string;
-  timeLimitSec?: number;
 };
 
 /** Duel の 1 問を組み立てる。 */
@@ -43,15 +69,12 @@ export function duelQuestion(input: DuelQuestionInput): DuelQuestion {
     explanation: input.explanation,
   };
 
-  if (input.timeLimitSec !== undefined) {
-    question.timeLimitSec = input.timeLimitSec;
-  }
-
+  applyOptional(question, input);
   return question;
 }
 
 /** Infer 問題の入力。 */
-export type InferQuestionInput = {
+export type InferQuestionInput = CommonOptionalInput & {
   id: string;
   difficulty: Difficulty;
   topic: string[];
@@ -63,7 +86,6 @@ export type InferQuestionInput = {
   /** 誤答候補（正解を含めない）。3 つ指定する。 */
   distractors: readonly string[];
   explanation: string;
-  timeLimitSec?: number;
 };
 
 /**
@@ -99,15 +121,12 @@ export function inferQuestion(input: InferQuestionInput): InferQuestion {
     explanation: input.explanation,
   };
 
-  if (input.timeLimitSec !== undefined) {
-    question.timeLimitSec = input.timeLimitSec;
-  }
-
+  applyOptional(question, input);
   return question;
 }
 
 /** Detective 問題の入力。 */
-export type DetectiveQuestionInput = {
+export type DetectiveQuestionInput = CommonOptionalInput & {
   id: string;
   difficulty: Difficulty;
   topic: string[];
@@ -123,7 +142,6 @@ export type DetectiveQuestionInput = {
   explanation: string;
   /** 修正例のコード。 */
   fix?: string;
-  timeLimitSec?: number;
 };
 
 /**
@@ -162,10 +180,7 @@ export function detectiveQuestion(input: DetectiveQuestionInput): DetectiveQuest
     question.fix = input.fix;
   }
 
-  if (input.timeLimitSec !== undefined) {
-    question.timeLimitSec = input.timeLimitSec;
-  }
-
+  applyOptional(question, input);
   return question;
 }
 

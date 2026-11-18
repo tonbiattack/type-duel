@@ -20,9 +20,12 @@ import {
 import {
   countByDifficulty,
   countByMode,
+  countByModeAndDifficulty,
+  countByTopic,
   validateQuestion,
   validateQuestionSet,
 } from "../src/lib/validate";
+import { isTimeAttackEligible } from "../src/lib/game";
 import {
   CHOICE_COUNT_BY_MODE,
   DIFFICULTIES,
@@ -392,7 +395,7 @@ describe("countByDifficulty", () => {
       makeDuelQuestion({ id: "a-2", difficulty: "easy" }),
       makeDuelQuestion({ id: "b-1", difficulty: "normal" }),
     ]);
-    expect(counts).toEqual({ easy: 2, normal: 1, hard: 0 });
+    expect(counts).toEqual({ easy: 2, normal: 1, hard: 0, advanced: 0 });
   });
 });
 
@@ -413,5 +416,90 @@ describe("getQuestionsForDifficulty", () => {
     const easy = getQuestionsForDifficulty("easy");
     expect(easy.length).toBeGreaterThan(0);
     expect(easy.every((question) => question.difficulty === "easy")).toBe(true);
+  });
+});
+
+describe("Advanced 難易度", () => {
+  it("各モードに Advanced が 10 問以上ある", () => {
+    for (const mode of GAME_MODES) {
+      const advanced = getQuestionsForMode(mode).filter(
+        (question) => question.difficulty === "advanced",
+      );
+      expect(advanced.length, mode).toBeGreaterThanOrEqual(10);
+    }
+  });
+
+  it("Advanced は合計 30 問以上ある", () => {
+    const advanced = allQuestions.filter((question) => question.difficulty === "advanced");
+    expect(advanced.length).toBeGreaterThanOrEqual(30);
+  });
+
+  it("Advanced の多くに段階解説がある", () => {
+    const advanced = allQuestions.filter((question) => question.difficulty === "advanced");
+    const withSteps = advanced.filter(
+      (question) => question.explanationSteps !== undefined && question.explanationSteps.length > 0,
+    );
+    expect(withSteps.length / advanced.length).toBeGreaterThan(0.5);
+  });
+
+  it("段階解説は 2 ステップ以上ある", () => {
+    for (const question of allQuestions) {
+      if (question.explanationSteps === undefined) {
+        continue;
+      }
+      expect(question.explanationSteps.length, question.id).toBeGreaterThanOrEqual(2);
+    }
+  });
+
+  it("段階解説の各ステップに title と body がある", () => {
+    for (const question of allQuestions) {
+      for (const [index, step] of (question.explanationSteps ?? []).entries()) {
+        expect(step.title.trim().length, `${question.id}[${index}]`).toBeGreaterThan(0);
+        expect(step.body.trim().length, `${question.id}[${index}]`).toBeGreaterThan(0);
+      }
+    }
+  });
+});
+
+describe("問題数の内訳", () => {
+  it("全 300 問以上ある", () => {
+    expect(allQuestions.length).toBeGreaterThanOrEqual(300);
+  });
+
+  it("モード × 難易度の内訳を集計できる", () => {
+    const breakdown = countByModeAndDifficulty(allQuestions);
+    expect(breakdown).toHaveLength(GAME_MODES.length * DIFFICULTIES.length);
+    const total = breakdown.reduce((sum, item) => sum + item.count, 0);
+    expect(total).toBe(allQuestions.length);
+  });
+
+  it("トピック別の問題数を集計できる", () => {
+    const topics = countByTopic(allQuestions);
+    expect(topics.length).toBeGreaterThan(10);
+    expect(topics[0]?.count).toBeGreaterThan(0);
+  });
+
+  it("トピックの偏りが極端でない", () => {
+    const topics = countByTopic(allQuestions);
+    const top = topics[0];
+    expect(top).toBeDefined();
+    if (top !== undefined) {
+      // 最多トピックが全体の 30% を超えない
+      expect(top.count / allQuestions.length).toBeLessThan(0.3);
+    }
+  });
+});
+
+describe("タイムアタック対象", () => {
+  it("タイムアタックに出題できる問題が十分ある", () => {
+    const eligible = allQuestions.filter((question) => isTimeAttackEligible(question));
+    expect(eligible.length).toBeGreaterThanOrEqual(60);
+  });
+
+  it("Advanced は原則タイムアタック対象外", () => {
+    const advanced = allQuestions.filter((question) => question.difficulty === "advanced");
+    const eligible = advanced.filter((question) => isTimeAttackEligible(question));
+    // 長いコードが多いので、大半は除外される
+    expect(eligible.length).toBeLessThan(advanced.length);
   });
 });

@@ -5,7 +5,7 @@
  *   1. `npm run build && npx vite preview --port 4173` を起動
  *   2. `node scripts/smoke.mjs`
  *
- * 3 モードすべてで タイトル → 10 問プレイ → 結果画面 を実際の Chromium で操作し、
+ * 3 モード × 3 遊びかたを実際の Chromium で操作し、
  * コンソールエラーとモバイル幅の横スクロールを検査する。
  */
 import { chromium } from "playwright";
@@ -65,10 +65,67 @@ async function playMode(mode, difficulty = "easy") {
   console.log(`OK: ${mode} 完走 スコア=${score} 正答率=${accuracy}`);
 }
 
+/** Advanced を 1 問だけ解いて段階解説を確認する。 */
+async function checkAdvanced() {
+  await page.goto(BASE_URL, { waitUntil: "networkidle" });
+  const card = page.locator("article.mode-duel");
+  await card.locator("details.mode-advanced summary").click();
+  await card.locator('button[data-difficulty="advanced"]').click();
+  await page.waitForSelector(".code-block");
+
+  await page.keyboard.press("1");
+  await page.waitForSelector(".explanation");
+
+  const steps = await page.locator(".step").count();
+  if (steps < 2) {
+    fail(`Advanced の段階解説が ${steps} ステップです`);
+  }
+  await page.getByRole("button", { name: "まとめて表示" }).click();
+  const open = await page.locator(".step.is-open").count();
+  if (open !== steps) {
+    fail(`まとめて表示で ${open} / ${steps} ステップしか開きません`);
+  }
+  console.log(`OK: Advanced 段階解説 ${steps} ステップ`);
+}
+
+/** タイムアタックを開始して自動送りを確認する。 */
+async function checkTimeAttack() {
+  await page.goto(BASE_URL, { waitUntil: "networkidle" });
+  await page.locator(".format-timeattack").click();
+  await page.waitForSelector(".code-block");
+
+  const before = await page.locator(".code-block").textContent();
+  await page.keyboard.press("1");
+  await page.waitForFunction(
+    (previous) => {
+      const current = document.querySelector(".code-block")?.textContent;
+      return current !== undefined && current !== previous;
+    },
+    before,
+    { timeout: 5000 },
+  );
+  console.log("OK: タイムアタックの自動送り");
+}
+
+/** 復習画面が開けることを確認する。 */
+async function checkReview() {
+  await page.goto(BASE_URL, { waitUntil: "networkidle" });
+  await page.locator(".format-review").click();
+  await page.waitForSelector(".screen-review");
+  const heading = await page.locator(".review-title").textContent();
+  if (heading !== "復習") {
+    fail(`復習画面の見出しが "${String(heading)}" です`);
+  }
+  console.log("OK: 復習画面");
+}
+
 try {
   for (const mode of ["duel", "infer", "detective"]) {
     await playMode(mode);
   }
+  await checkAdvanced();
+  await checkTimeAttack();
+  await checkReview();
 
   // モバイル幅でも崩れないか
   await page.setViewportSize({ width: 375, height: 812 });

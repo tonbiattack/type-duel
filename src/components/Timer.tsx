@@ -4,6 +4,10 @@ type TimerProps = {
   remainingMs: number;
   timeLimitMs: number;
   paused: boolean;
+  /** ラベル。未指定なら「残り時間」。 */
+  label?: string;
+  /** 制限時間がない場合は非表示にする。 */
+  hidden?: boolean;
 };
 
 /**
@@ -12,7 +16,17 @@ type TimerProps = {
  * 数値（秒）とバーの両方で示し、色だけに依存しない。
  * 残量が少なくなると `is-warning` を付けて強調する。
  */
-export function Timer({ remainingMs, timeLimitMs, paused }: TimerProps): React.JSX.Element {
+export function Timer({
+  remainingMs,
+  timeLimitMs,
+  paused,
+  label = "残り時間",
+  hidden = false,
+}: TimerProps): React.JSX.Element {
+  if (hidden) {
+    return <></>;
+  }
+
   const ratio = timeLimitMs <= 0 ? 0 : Math.max(0, Math.min(1, remainingMs / timeLimitMs));
   const seconds = Math.max(0, remainingMs / 1000);
   const isWarning = ratio <= TIMER_WARNING_RATIO;
@@ -20,7 +34,7 @@ export function Timer({ remainingMs, timeLimitMs, paused }: TimerProps): React.J
   return (
     <div className={`timer${isWarning ? " is-warning" : ""}${paused ? " is-paused" : ""}`}>
       <div className="timer-head">
-        <span className="timer-label">残り時間</span>
+        <span className="timer-label">{label}</span>
         <span className="timer-value" aria-live="off">
           {seconds.toFixed(1)}
           <span className="timer-unit">秒</span>
@@ -29,7 +43,7 @@ export function Timer({ remainingMs, timeLimitMs, paused }: TimerProps): React.J
       <div
         className="timer-bar"
         role="progressbar"
-        aria-label="残り時間"
+        aria-label={label}
         aria-valuemin={0}
         aria-valuemax={Math.round(timeLimitMs / 1000)}
         aria-valuenow={Math.ceil(seconds)}
