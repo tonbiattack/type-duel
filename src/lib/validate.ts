@@ -153,6 +153,32 @@ export function validateQuestion(question: Question, index: number): ValidationI
     }
   }
 
+  // 段階解説（任意）。指定するなら各ステップに内容が必要。
+  if (question.explanationSteps !== undefined) {
+    if (!Array.isArray(question.explanationSteps) || question.explanationSteps.length === 0) {
+      push("explanationSteps を指定する場合は 1 つ以上のステップが必要です");
+    } else {
+      question.explanationSteps.forEach((step, stepIndex) => {
+        if (!isNonEmptyString(step.title)) {
+          push(`explanationSteps[${stepIndex}] の title が空です`);
+        }
+        if (!isNonEmptyString(step.body)) {
+          push(`explanationSteps[${stepIndex}] の body が空です`);
+        }
+        if (step.typeAfter !== undefined && !isNonEmptyString(step.typeAfter)) {
+          push(`explanationSteps[${stepIndex}] の typeAfter を指定する場合は空にできません`);
+        }
+      });
+    }
+  }
+
+  if (
+    question.timeAttackEligible !== undefined &&
+    typeof question.timeAttackEligible !== "boolean"
+  ) {
+    push("timeAttackEligible は boolean にしてください");
+  }
+
   return issues;
 }
 
@@ -204,7 +230,7 @@ export function validateQuestionSet(
 
 /** 難易度ごとの問題数を数える。 */
 export function countByDifficulty(questions: readonly Question[]): Record<Difficulty, number> {
-  const counts: Record<Difficulty, number> = { easy: 0, normal: 0, hard: 0 };
+  const counts: Record<Difficulty, number> = { easy: 0, normal: 0, hard: 0, advanced: 0 };
   for (const question of questions) {
     if (DIFFICULTIES.includes(question.difficulty)) {
       counts[question.difficulty] += 1;
@@ -227,4 +253,70 @@ export function countByMode(questions: readonly Question[]): Record<GameMode, nu
 /** Duel の正答が「代入できる」かどうか。 */
 export function isAssignableAnswer(question: Question): boolean {
   return question.answer === DUEL_CHOICE_IDS.assignable;
+}
+
+/** トピック別の問題数。 */
+export type TopicCount = {
+  topic: string;
+  count: number;
+};
+
+/** トピック別の問題数を多い順に返す。 */
+export function countByTopic(questions: readonly Question[]): TopicCount[] {
+  const counts = new Map<string, number>();
+  for (const question of questions) {
+    for (const topic of question.topic) {
+      counts.set(topic, (counts.get(topic) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()]
+    .map(([topic, count]) => ({ topic, count }))
+    .sort((a, b) => b.count - a.count || a.topic.localeCompare(b.topic));
+}
+
+/** モード × 難易度の内訳。 */
+export type ModeDifficultyCount = {
+  mode: GameMode;
+  difficulty: Difficulty;
+  count: number;
+};
+
+/** モード × 難易度の問題数を行列で返す（0 件も含む）。 */
+export function countByModeAndDifficulty(questions: readonly Question[]): ModeDifficultyCount[] {
+  const counts = new Map<string, number>();
+  for (const question of questions) {
+    const key = `${question.mode}:${question.difficulty}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  const result: ModeDifficultyCount[] = [];
+  for (const mode of GAME_MODES) {
+    for (const difficulty of DIFFICULTIES) {
+      result.push({
+        mode,
+        difficulty,
+        count: counts.get(`${mode}:${difficulty}`) ?? 0,
+      });
+    }
+  }
+  return result;
+}
+
+/** 問題 ID → トピックの対応表を作る。 */
+export function buildTopicIndex(
+  questions: readonly Question[],
+): ReadonlyMap<string, readonly string[]> {
+  return new Map(questions.map((question) => [question.id, question.topic]));
+}
+
+/** 問題 ID → モード・難易度の対応表を作る。 */
+export function buildMetaIndex(
+  questions: readonly Question[],
+): ReadonlyMap<string, { mode: GameMode; difficulty: Difficulty }> {
+  return new Map(
+    questions.map((question) => [
+      question.id,
+      { mode: question.mode, difficulty: question.difficulty },
+    ]),
+  );
 }

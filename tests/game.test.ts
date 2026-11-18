@@ -12,21 +12,37 @@ import {
 } from "../src/data/questions";
 import {
   answer,
+  averageAnswerMs,
   calculateScore,
   currentQuestion,
   formatAccuracy,
   isAnswered,
   isLastQuestion,
+  isTimeAttackEligible,
+  missedQuestionIds,
   next,
   pickRandom,
+  pickWithHistory,
   startGame,
+  startReview,
+  startTimeAttack,
   summarize,
   tick,
   timeOut,
   togglePause,
   type GameState,
 } from "../src/lib/game";
-import { BASE_SCORE, QUESTIONS_PER_GAME, TIME_BONUS_PER_SEC } from "../src/lib/config";
+import {
+  BASE_SCORE,
+  QUESTIONS_PER_GAME,
+  REVIEW_MAX_QUESTIONS,
+  TIME_ATTACK_BASE_SCORE,
+  TIME_ATTACK_DURATION_MS,
+  TIME_ATTACK_PENALTY,
+  TIME_ATTACK_STREAK_BONUS,
+  TIME_ATTACK_STREAK_CAP,
+  TIME_BONUS_PER_SEC,
+} from "../src/lib/config";
 import { DUEL_CHOICE_IDS } from "../src/types/question";
 
 /** 常に 0 を返す乱数（抽選順を固定する）。 */
@@ -420,5 +436,210 @@ describe("モード別のゲーム進行", () => {
       });
       expect(currentQuestion(state).choices).toHaveLength(4);
     }
+  });
+});
+
+describe("タイムアタック", () => {
+  /** タイムアタックを開始する。 */
+  function startTA(): GameState {
+    return startTimeAttack({ questions: allQuestions, random: zeroRandom });
+  }
+
+  it("60 秒で開始する", () => {
+    const state = startTA();
+    expect(state.format).toBe("timeAttack");
+    expect(state.remainingMs).toBe(TIME_ATTACK_DURATION_MS);
+    expect(state.timeLimitMs).toBe(TIME_ATTACK_DURATION_MS);
+  });
+
+  it("長いコードの問題は除外される", () => {
+    const state = startTA();
+    for (const question of state.questions) {
+      expect(isTimeAttackEligible(question), question.id).toBe(true);
+    }
+  });
+
+  it("正解すると基本点 + 連続ボーナスが入る", () => {
+    let state = startTA();
+    const first = answerCorrectly(state);
+    expect(first.results[0]?.score).toBe(TIME_ATTACK_BASE_SCORE);
+    expect(first.phase).toBe("feedback");
+
+    state = next(first);
+    const second = answerCorrectly(state);
+    expect(second.results[1]?.score).toBe(TIME_ATTACK_BASE_SCORE + TIME_ATTACK_STREAK_BONUS);
+  });
+
+  it("連続ボーナスには上限がある", () => {
+    let state = startTA();
+    for (let i = 0; i < TIME_ATTACK_STREAK_CAP + 3; i += 1) {
+      state = next(answerCorrectly(state));
+    }
+    const last = state.results[state.results.length - 1];
+    expect(last?.score).toBe(
+      TIME_ATTACK_BASE_SCORE + TIME_ATTACK_STREAK_CAP * TIME_ATTACK_STREAK_BONUS,
+    );
+  });
+
+  it("不正解はペナルティだがスコアは 0 未満にならない", () => {
+    const state = startTA();
+    const wrong = answerIncorrectly(state);
+    expect(wrong.score).toBe(0);
+    expect(wrong.results[0]?.score).toBe(-TIME_ATTACK_PENALTY);
+  });
+
+  it("回答後は feedback フェーズになる", () => {
+    const state = answerCorrectly(startTA());
+    expect(state.phase).toBe("feedback");
+  });
+
+  it("feedback から次へ進める", () => {
+    const state = next(answerCorrectly(startTA()));
+    expect(state.phase).toBe("answering");
+    expect(state.index).toBe(1);
+  });
+
+  it("時間切れで即終了する", () => {
+    const state = startTA();
+    const ticked = tick(state, TIME_ATTACK_DURATION_MS + 100);
+    expect(ticked.phase).toBe("finished");
+    expect(ticked.remainingMs).toBe(0);
+  });
+
+  it("feedback 中もタイマーが進む", () => {
+    const state = answerCorrectly(startTA());
+    const ticked = tick(state, 1000);
+    expect(ticked.remainingMs).toBe(state.remainingMs - 1000);
+  });
+
+  it("ポーズ中はタイマーが進まない", () => {
+    const paused = togglePause(startTA());
+    expect(tick(paused, 1000)).toBe(paused);
+  });
+
+  it("二重回答は採点されない", () => {
+    const state = startTA();
+    const first = answerCorrectly(state);
+    expect(answer(first, "choice-1")).toBe(first);
+    expect(first.results).toHaveLength(1);
+  });
+
+  it("時間切れ後は次へ進めない", () => {
+    const finished = tick(startTA(), TIME_ATTACK_DURATION_MS + 100);
+    expect(next(finished)).toBe(finished);
+  });
+
+  it("問題が尽きたら終了する", () => {
+    let state = startTimeAttack({ questions: [allQuestions[0]!], random: zeroRandom });
+    state = next(answerCorrectly(state));
+    expect(state.phase).toBe("finished");
+  });
+});
+
+describe("復習", () => {
+  it("制限時間なしで開始する", () => {
+    const state = startReview({
+      mode: "duel",
+      difficulty: "easy",
+      questions: getQuestionsForDifficulty("easy"),
+      random: zeroRandom,
+    });
+    expect(state.format).toBe("review");
+    expect(state.timeLimitEnabled).toBe(false);
+    expect(state.remainingMs).toBe(0);
+  });
+
+  it("タイマーが進まない", () => {
+    const state = startReview({
+      mode: "duel",
+      difficulty: "easy",
+      questions: getQuestionsForDifficulty("easy"),
+      random: zeroRandom,
+    });
+    expect(tick(state, 5000)).toBe(state);
+  });
+
+  it("時間切れにならない", () => {
+    const state = startReview({
+      mode: "duel",
+      difficulty: "easy",
+      questions: getQuestionsForDifficulty("easy"),
+      random: zeroRandom,
+    });
+    const answered = answer(state, currentQuestion(state).answer);
+    expect(answered.results[0]?.timedOut).toBe(false);
+    expect(answered.results[0]?.correct).toBe(true);
+  });
+
+  it("最大 10 問に制限される", () => {
+    const state = startReview({
+      mode: "duel",
+      difficulty: "easy",
+      questions: allQuestions,
+      random: zeroRandom,
+    });
+    expect(state.questions.length).toBeLessThanOrEqual(REVIEW_MAX_QUESTIONS);
+  });
+
+  it("問題がなければ例外", () => {
+    expect(() =>
+      startReview({ mode: "duel", difficulty: "easy", questions: [], random: zeroRandom }),
+    ).toThrow();
+  });
+});
+
+describe("pickWithHistory", () => {
+  it("未出題の問題を優先する", () => {
+    const items = [{ id: "a" }, { id: "b" }, { id: "c" }];
+    const picked = pickWithHistory(items, 2, ["a"], zeroRandom);
+    expect(picked.map((item) => item.id)).not.toContain("a");
+  });
+
+  it("未出題で足りなければ出題済みから補充する", () => {
+    const items = [{ id: "a" }, { id: "b" }];
+    const picked = pickWithHistory(items, 2, ["a", "b"], zeroRandom);
+    expect(picked).toHaveLength(2);
+  });
+
+  it("履歴が空なら通常の抽選と同じ", () => {
+    const items = [{ id: "a" }, { id: "b" }, { id: "c" }];
+    expect(pickWithHistory(items, 2, [], zeroRandom)).toHaveLength(2);
+  });
+});
+
+describe("isTimeAttackEligible", () => {
+  it("短いコードは出題できる", () => {
+    const question = getQuestionsForDifficulty("easy")[0];
+    expect(question).toBeDefined();
+    if (question !== undefined) {
+      expect(isTimeAttackEligible(question)).toBe(true);
+    }
+  });
+
+  it("明示指定が優先される", () => {
+    const question = getQuestionsForDifficulty("easy")[0];
+    expect(question).toBeDefined();
+    if (question !== undefined) {
+      expect(isTimeAttackEligible({ ...question, timeAttackEligible: false })).toBe(false);
+      expect(isTimeAttackEligible({ ...question, timeAttackEligible: true })).toBe(true);
+    }
+  });
+});
+
+describe("averageAnswerMs / missedQuestionIds", () => {
+  it("平均回答時間を返す", () => {
+    const state = startEasy();
+    expect(averageAnswerMs(state)).toBe(0);
+    const answered = answerCorrectly(state);
+    expect(averageAnswerMs(answered)).toBeGreaterThanOrEqual(0);
+  });
+
+  it("間違えた問題の ID を返す", () => {
+    const state = answerIncorrectly(startEasy());
+    expect(missedQuestionIds(state)).toEqual([currentQuestion(state).id]);
+  });
+
+  it("全問正解なら空", () => {
+    expect(missedQuestionIds(answerCorrectly(startEasy()))).toEqual([]);
   });
 });

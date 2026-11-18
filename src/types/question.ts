@@ -37,16 +37,24 @@ export const MODE_DESCRIPTIONS: Record<GameMode, string> = {
 };
 
 /** 難易度。 */
-export type Difficulty = "easy" | "normal" | "hard";
+export type Difficulty = "easy" | "normal" | "hard" | "advanced";
 
 /** 難易度の一覧（表示順）。 */
-export const DIFFICULTIES: readonly Difficulty[] = ["easy", "normal", "hard"];
+export const DIFFICULTIES: readonly Difficulty[] = ["easy", "normal", "hard", "advanced"];
+
+/**
+ * タイトル画面で最初に見せる難易度。
+ *
+ * Advanced は上級者向けなので、初期表示では折りたたむ（選択を複雑にしない）。
+ */
+export const PRIMARY_DIFFICULTIES: readonly Difficulty[] = ["easy", "normal", "hard"];
 
 /** 難易度の表示名。 */
 export const DIFFICULTY_LABELS: Record<Difficulty, string> = {
   easy: "Easy",
   normal: "Normal",
   hard: "Hard",
+  advanced: "Advanced",
 };
 
 /** 難易度の補足説明（タイトル画面用）。 */
@@ -54,6 +62,15 @@ export const DIFFICULTY_DESCRIPTIONS: Record<Difficulty, string> = {
   easy: "literal / primitive / union / array",
   normal: "object / optional / readonly / unknown / never / tuple",
   hard: "generic / conditional / indexed access / keyof / mapped types",
+  advanced: "複数の型機能が絡み合う複合問題",
+};
+
+/** 難易度の短い説明（Advanced の折りたたみ表示用）。 */
+export const DIFFICULTY_TAGLINES: Record<Difficulty, string> = {
+  easy: "基礎",
+  normal: "中級",
+  hard: "上級",
+  advanced: "複合",
 };
 
 /** 選択肢。 */
@@ -62,6 +79,21 @@ export type Choice = {
   id: string;
   /** ボタンに表示するラベル。 */
   label: string;
+};
+
+/**
+ * 解説の 1 ステップ。
+ *
+ * 複合型の問題は「どの順番で型が評価されるか」を追えないと納得できない。
+ * 1 ステップ 1 変換で、評価の流れを順に示す。
+ */
+export type ExplanationStep = {
+  /** ステップの見出し（例: "条件型を分配する"）。 */
+  title: string;
+  /** 何がどう変わるかの説明。 */
+  body: string;
+  /** このステップ後の型（任意）。 */
+  typeAfter?: string;
 };
 
 /** 全モード共通の問題データ。 */
@@ -81,8 +113,22 @@ export type QuestionBase = {
   answer: string;
   /** 正誤確定後に表示する解説。 */
   explanation: string;
+  /**
+   * 段階解説（任意）。
+   *
+   * 指定すると「1 ステップずつ開く」UI が使える。
+   * 短い `explanation` だけでも成立するよう、両者は独立している。
+   */
+  explanationSteps?: ExplanationStep[];
   /** 個別の制限時間（秒）。未指定なら既定値を使う。 */
   timeLimitSec?: number;
+  /**
+   * タイムアタックで出題してよいか。
+   *
+   * コードが長い・読解に時間がかかる問題は `false` にして除外する。
+   * 未指定なら難易度から自動判定する。
+   */
+  timeAttackEligible?: boolean;
 };
 
 /**
@@ -144,4 +190,30 @@ export const CHOICE_COUNT_BY_MODE: Record<GameMode, number> = {
   duel: 2,
   infer: 4,
   detective: 4,
+};
+
+/**
+ * プレイ形式。
+ *
+ * - `standard`: 10 問を解き、毎問解説を読む学習モード
+ * - `timeAttack`: 60 秒で何問解けるかを競う。回答後は自動で次へ
+ * - `review`: 間違えた問題をトピック別に解き直す
+ */
+export type GameFormat = "standard" | "timeAttack" | "review";
+
+/** プレイ形式の一覧（表示順）。 */
+export const GAME_FORMATS: readonly GameFormat[] = ["standard", "timeAttack", "review"];
+
+/** プレイ形式の表示名。 */
+export const FORMAT_LABELS: Record<GameFormat, string> = {
+  standard: "10問チャレンジ",
+  timeAttack: "60秒タイムアタック",
+  review: "復習",
+};
+
+/** プレイ形式の一言説明。 */
+export const FORMAT_TAGLINES: Record<GameFormat, string> = {
+  standard: "10 問をじっくり。毎問解説を読める",
+  timeAttack: "60 秒で何問解けるか。回答後は自動で次へ",
+  review: "間違えた問題をトピック別に解き直す",
 };
